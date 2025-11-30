@@ -1,0 +1,33 @@
+{% extends "gallery/base.html" %} {% load static %} {% block title %}TImur Geruzov{% endblock %} {% block content %}
+<div class="upload-container">
+  <form method="post" enctype="multipart/form-data" id="upload-form">
+    {% csrf_token %}
+    <div class="form-group">
+      <div class="file-upload-wrapper">
+        <label class="file-upload-label" for="id_files">
+          {{ form.files }}
+          <svg class="file-upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span>Click to upload or drag and drop</span>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" id="submit-btn" class="submit-button">Опубликовать</button>
+      </div>
+    </div>
+    <div class="preview-container" id="preview-container"></div>
+  </form>
+  {% if messages %} {% for message in messages %}
+  <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+  {% endfor %} {% endif %} {% if form.errors %}
+  <div class="alert alert-danger">
+    <ul>
+      {% for field, errors in form.errors.items %} {% for error in errors %}
+      <li>{{ error }}</li>
+      {% endfor %} {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %} {% block scripts %} {{ block.super }} {% endblock %}

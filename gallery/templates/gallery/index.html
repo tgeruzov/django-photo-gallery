@@ -1,0 +1,13 @@
+{% extends "gallery/base.html" %} {% load static %} {% block title %}TImur Geruzov{% endblock %} {% block content %} {% if messages %}{% endif %}
+<div class="gallery" id="gallery">{% include "gallery/partials/photo_cards.html" with photos=photos_page %}</div>
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-prev" aria-label="Предыдущее фото">
+    <span class="material-icons">chevron_left</span>
+  </button>
+  <img src="" alt="Увеличенное изображение" />
+  <button class="lightbox-next" aria-label="Следующее фото">
+    <span class="material-icons">chevron_right</span>
+  </button>
+  <div class="lightbox-hint">Тапните по краям для переключения</div>
+</div>
+{% endblock %} {% block scripts %} {{ block.super }} {% endblock %}

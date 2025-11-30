@@ -1,0 +1,41 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Timur Geruzov{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
+    <link rel="icon" href="{% static 'icon/favicon-light.ico' %}" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="{% static 'icon/favicon-dark.ico' %}" media="(prefers-color-scheme: light)" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+    {% block head_scripts %}{% endblock %}
+  </head>
+  <body>
+    <button class="theme-toggle" aria-label="Toggle theme">
+      <svg class="theme-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="6" fill="currentColor" />
+      </svg>
+    </button>
+    {% if user.is_staff or user.is_superuser %}
+    <button class="upload-toggle" aria-label="Upload photo" onclick="location.href='{% url 'upload_photo' %}'">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    </button>
+    {% endif %}
+    <header>
+      <div class="header-glow">
+        <div class="glow-circle"></div>
+        <div class="glow-circle"></div>
+        <div class="glow-circle"></div>
+        <div class="glow-circle"></div>
+        <div class="glow-circle"></div>
+      </div>
+      <h1>Timur Geruzov</h1>
+    </header>
+    <main>{% block content %}{% endblock %}</main>
+    <script src="{% static 'js/script.js' %}"></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

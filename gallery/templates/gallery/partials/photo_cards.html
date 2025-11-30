@@ -1,0 +1,13 @@
+{% load static %} {% for photo in photos %}
+<div class="card">
+  {% if photo.thumbnail %}
+  <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo.image.name|default:'Uploaded Image' }}" data-full="{{ photo.image.url }}" />
+  {% elif photo.image %}
+  <img loading="lazy" src="{{ photo.image.url }}" alt="{{ photo.image.name|default:'Uploaded Image' }}" data-full="{{ photo.image.url }}" />
+  {% else %}
+  <div class="no-image-placeholder">Image unavailable</div>
+  {% endif %}
+</div>
+{% empty %} {% if not request.GET.page or request.GET.page == '1' %}
+<div class="no-images-message-icon">Нет загруженных изображений</div>
+{% endif %} {% endfor %}
