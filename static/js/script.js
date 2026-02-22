@@ -57,11 +57,10 @@ function initLightbox() {
   let allPhotos = [];
   let currentIndex = -1;
 
-  // Загружаем все фото один раз
-  fetch('/all_photos.json')
-    .then(resp => resp.json())
-    .then(data => {
-        allPhotos = data.photos || [];
+  // Загружаем все фото постранично
+  fetchAllPhotos()
+    .then(photos => {
+        allPhotos = photos;
     })
     .catch(() => {
         // Фолбэк на видимые фото
@@ -84,7 +83,15 @@ function initLightbox() {
     const img = e.target.closest('.card img');
     if (img) {
         const fullUrl = img.getAttribute('data-full');
-        const index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
+        let index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
+        if (index === -1) {
+            allPhotos = Array.from(gallery.querySelectorAll('.card img')).map(node => ({
+                url: node.src,
+                full_url: node.getAttribute('data-full'),
+                title: node.alt || '',
+            }));
+            index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
+        }
         if (index !== -1) showPhoto(index);
     }
   });
@@ -159,19 +166,16 @@ function setupInfiniteScroll(gallery, observer) {
         });
         const data = await response.json();
         
-        if (data.photos && data.photos.length) {
+        if (Array.isArray(data.photos) && data.photos.length) {
             data.photos.forEach(photo => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `<img loading="lazy" src="${photo.url}" alt="${photo.title}" data-full="${photo.full_url}" />`;
+                const card = createGalleryCard(photo);
+                if (!card) return;
                 gallery.appendChild(card);
                 if (observer) observer.observe(card);
             });
             page++;
-            hasMore = data.has_next;
-        } else {
-            hasMore = false;
         }
+        hasMore = Boolean(data.has_next);
     } catch (err) {
         console.error('Ошибка загрузки:', err);
     } finally {
@@ -322,7 +326,7 @@ function initUploadForm() {
           
           const result = await response.json();
           
-          if (result.success) {
+          if (response.ok && result.success) {
               selectedFiles = [];
               updateFileInput();
               preview.innerHTML = '';
@@ -379,4 +383,52 @@ function showSwipeHint() {
       }, 2000);
       sessionStorage.setItem('hintShown', 'true');
   }
+}
+
+function createGalleryCard(photo) {
+  if (!photo || !photo.url || !photo.full_url) return null;
+
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const img = document.createElement('img');
+  img.loading = 'lazy';
+  img.src = photo.url;
+  img.alt = photo.title || '';
+  img.dataset.full = photo.full_url;
+
+  card.appendChild(img);
+  return card;
+}
+
+async function fetchAllPhotos() {
+  const allPhotos = [];
+  let page = 1;
+  let hasNext = true;
+  const pageSize = 100;
+
+  while (hasNext) {
+    const response = await fetch(`/all_photos.json?page=${page}&page_size=${pageSize}`, {
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Не удалось получить фото: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data.photos)) {
+      allPhotos.push(...data.photos.filter(photo => photo && photo.full_url && photo.url));
+    }
+
+    hasNext = Boolean(data.has_next);
+    page += 1;
+
+    if (page > 1000) {
+      console.warn('Остановлена загрузка lightbox: слишком много страниц');
+      break;
+    }
+  }
+
+  return allPhotos;
 }

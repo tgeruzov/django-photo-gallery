@@ -5,6 +5,12 @@ class Photo(models.Model):
         upload_to='photos/%Y/%m/%d/',
         verbose_name="Оригинальное изображение"
     )
+    optimized_image = models.ImageField(
+        upload_to='optimized/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        verbose_name="Оптимизированное изображение"
+    )
     thumbnail = models.ImageField(
         upload_to='thumbnails/%Y/%m/%d/',
         null=True,
@@ -14,17 +20,21 @@ class Photo(models.Model):
     alt_text = models.CharField(
         max_length=255,
         blank=True,
-        verbose_name="Описание для SEO"
+        verbose_name="Альтернативный текст (для SEO и доступности)"
     )
     title = models.CharField(
         max_length=200,
         blank=True,
-        verbose_name="Название/описание"
+        verbose_name="Заголовок/Описание"
     )
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата загрузки")
 
     def __str__(self):
-        return self.title or self.image.name
+        if self.title:
+            return self.title
+        if self.image:
+            return self.image.name
+        return f"Photo #{self.pk or 'new'}"
 
     class Meta:
         verbose_name = "Фотография"

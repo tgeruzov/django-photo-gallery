@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.conf import settings
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.http import JsonResponse
@@ -6,21 +7,48 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.http import require_GET
 import logging
 import os
-from io import BytesIO
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.files.base import ContentFile
-from PIL import Image
+from django.db import transaction
 from .forms import PhotoUploadForm
 from .models import Photo
+from .constants import AJAX_HEADER, AJAX_VALUE
+from .image_utils import (
+    ImageProcessingError,
+    build_optimized_content,
+    build_thumbnail_content,
+    open_image_from_file,
+)
 
 logger = logging.getLogger(__name__)
 
-# Бывает глючит на айфонах, потом разберусь
-AJAX_HEADER = 'HTTP_X_REQUESTED_WITH'
-AJAX_VALUE = 'XMLHttpRequest'
-
 def is_ajax(request):
-    return request.META.get(AJAX_HEADER) == AJAX_VALUE
+    return request.META.get(AJAX_HEADER) == AJAX_VALUE or request.headers.get('X-Requested-With') == AJAX_VALUE
+
+
+def serialize_photo(photo):
+    display_image = photo.thumbnail or photo.optimized_image or photo.image
+    full_image = photo.optimized_image or photo.image
+
+    if not full_image:
+        return None
+
+    try:
+        full_url = full_image.url
+    except ValueError:
+        return None
+
+    try:
+        preview_url = display_image.url if display_image else full_url
+    except ValueError:
+        preview_url = full_url
+
+    return {
+        'id': photo.id,
+        'url': preview_url,
+        'full_url': full_url,
+        'title': str(photo),
+    }
 
 def index(request):
     photos_list = Photo.objects.all().order_by('-uploaded_at')
@@ -39,104 +67,139 @@ def index(request):
     if is_ajax(request):
         photos_data = []
         for photo in photos_page:
-            photos_data.append({
-                'url': photo.thumbnail.url if photo.thumbnail else photo.image.url,
-                'full_url': photo.image.url,
-                'title': str(photo)
-            })
+            serialized = serialize_photo(photo)
+            if serialized:
+                photos_data.append(serialized)
         return JsonResponse({
             'photos': photos_data,
-            'has_next': photos_page.has_next()
+            'has_next': photos_page.has_next(),
+            'page': photos_page.number,
         })
 
     return render(request, 'gallery/index.html', {'photos_page': photos_page})
 
 def save_optimized_and_thumbnail(uploaded_file):
-    """
-    Сохраняет оригинал, оптимизированную копию и миниатюру
-    TODO: иногда падает на больших PNG, нужно фиксить
-    """
-    original = Photo()
-    original.image.save(uploaded_file.name, uploaded_file)
-    original.save()
+    """Сохраняет оригинал, оптимизированную копию и миниатюру атомарно."""
+    uploaded_file.seek(0)
+    img = open_image_from_file(uploaded_file)
+    optimized_content = build_optimized_content(img, uploaded_file.name)
+    thumbnail_content = build_thumbnail_content(img, uploaded_file.name)
 
     uploaded_file.seek(0)
-    img = Image.open(uploaded_file).convert('RGB')
+    original_name = os.path.basename(uploaded_file.name)
+    original_content = ContentFile(uploaded_file.read(), name=original_name)
 
-    def make_webp(img_source, size, quality, suffix):
-        img_copy = img_source.copy()
-        img_copy.thumbnail(size, Image.LANCZOS)
-        buffer = BytesIO()
-        base, _ = os.path.splitext(uploaded_file.name)
-        name = f"{base}{suffix}.webp"
-        img_copy.save(buffer, format='WEBP', quality=quality, method=6)
-        return ContentFile(buffer.getvalue(), name=name)
+    with transaction.atomic():
+        photo = Photo()
+        photo.image.save(original_name, original_content, save=False)
+        photo.optimized_image.save(optimized_content.name, optimized_content, save=False)
+        photo.thumbnail.save(thumbnail_content.name, thumbnail_content, save=False)
+        photo.save()
 
-    # Оптимизированная версия
-    opt_content = make_webp(img, (2560, 2560), 95, '_optimized')
-    
-    # Миниатюра
-    thumb_content = make_webp(img, (800, 800), 95, '_thumb')
-
-    original.image.save(opt_content.name, opt_content)
-    original.thumbnail.save(thumb_content.name, thumb_content)
-    original.save()
-    return original
+    return photo
 
 @staff_member_required
 def upload_photo(request):
+    form = PhotoUploadForm(request.POST or None, request.FILES or None)
+
     if request.method == 'POST':
-        form = PhotoUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            files = request.FILES.getlist('files')
-            uploaded_count = 0
-            errors = []
-
-            for file in files:
-                try:
-                    save_optimized_and_thumbnail(file)
-                    uploaded_count += 1
-                except Exception as e:
-                    logger.error(f"Ошибка обработки {file.name}: {e}")
-                    errors.append(f"{file.name}: {e}")
-                    continue
-
-            msg = f'Загружено {uploaded_count} фото'
-            if errors:
-                msg += f" (с ошибками: {len(errors)})"
-
+        if not form.is_valid():
+            validation_errors = {field: [str(error) for error in errs] for field, errs in form.errors.items()}
             if is_ajax(request):
                 return JsonResponse({
-                    'success': True,
-                    'redirect_url': reverse('index'),
-                    'message': msg,
-                    'errors': errors
-                })
+                    'success': False,
+                    'error': 'Ошибки валидации',
+                    'details': validation_errors,
+                }, status=400)
+            messages.error(request, 'Исправьте ошибки формы и попробуйте снова.')
+            return render(request, 'gallery/upload.html', {'form': form}, status=400)
 
-            if uploaded_count > 0:
-                request.session['upload_message'] = msg
-            return redirect(reverse('index'))
+        files = form.cleaned_data.get('files', [])
+        uploaded_count = 0
+        errors = []
 
-        errors = {field: [str(e) for e in errs] for field, errs in form.errors.items()}
+        for file in files:
+            try:
+                save_optimized_and_thumbnail(file)
+                uploaded_count += 1
+            except ImageProcessingError as exc:
+                logger.warning("Ошибка обработки %s: %s", file.name, exc)
+                errors.append(f"{file.name}: {exc}")
+            except Exception as exc:
+                logger.exception("Непредвиденная ошибка обработки %s: %s", file.name, exc)
+                errors.append(f"{file.name}: внутренняя ошибка обработки")
+
+        if uploaded_count == 0:
+            if is_ajax(request):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Не удалось загрузить ни одного файла',
+                    'errors': errors,
+                }, status=400)
+            messages.error(request, 'Не удалось загрузить ни одного фото.')
+            for error in errors:
+                messages.error(request, error)
+            return render(request, 'gallery/upload.html', {'form': PhotoUploadForm()}, status=400)
+
+        msg = f'Загружено {uploaded_count} фото'
+        if errors:
+            msg += f" (с ошибками: {len(errors)})"
+
         if is_ajax(request):
             return JsonResponse({
-                'success': False,
-                'error': 'Ошибки валидации',
-                'details': errors
+                'success': True,
+                'redirect_url': reverse('index'),
+                'message': msg,
+                'errors': errors,
             })
 
-    form = PhotoUploadForm()
+        if errors:
+            messages.warning(request, msg)
+            for error in errors:
+                messages.warning(request, error)
+        else:
+            messages.success(request, msg)
+        return redirect(reverse('index'))
+
     return render(request, 'gallery/upload.html', {'form': form})
 
 @require_GET
 def all_photos_json(request):
     photos = Photo.objects.all().order_by('-uploaded_at')
-    data = []
-    for photo in photos:
-        data.append({
-            'id': photo.id,
-            'url': photo.thumbnail.url if photo.thumbnail else photo.image.url,
-            'full_url': photo.image.url,
-            'title': str(photo)
+    max_page_size = max(1, int(getattr(settings, 'MAX_JSON_PAGE_SIZE', 200)))
+
+    try:
+        page_size = int(request.GET.get('page_size', max_page_size))
+    except (TypeError, ValueError):
+        page_size = max_page_size
+    page_size = max(1, min(page_size, max_page_size))
+
+    paginator = Paginator(photos, page_size)
+    page_number = request.GET.get('page', 1)
+
+    try:
+        photos_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        photos_page = paginator.page(1)
+    except EmptyPage:
+        return JsonResponse({
+            'photos': [],
+            'page': paginator.num_pages if paginator.num_pages else 1,
+            'page_size': page_size,
+            'has_next': False,
+            'total': paginator.count,
         })
-    return JsonResponse({'photos': data})
+
+    data = []
+    for photo in photos_page:
+        serialized = serialize_photo(photo)
+        if serialized:
+            data.append(serialized)
+
+    return JsonResponse({
+        'photos': data,
+        'page': photos_page.number,
+        'page_size': page_size,
+        'has_next': photos_page.has_next(),
+        'total': paginator.count,
+    })

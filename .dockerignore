@@ -1,0 +1,13 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+db.sqlite3
+media/
+staticfiles/
+node_modules/
+*.log
+.pytest_cache/

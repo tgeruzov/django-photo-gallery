@@ -1,9 +1,13 @@
 {% load static %} {% for photo in photos %}
 <div class="card">
-  {% if photo.thumbnail %}
-  <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo.image.name|default:'Uploaded Image' }}" data-full="{{ photo.image.url }}" />
+  {% if photo.thumbnail and photo.optimized_image %}
+  <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo.alt_text|default:photo.title|default:'Uploaded Image' }}" data-full="{{ photo.optimized_image.url }}" />
+  {% elif photo.thumbnail and photo.image %}
+  <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo.alt_text|default:photo.title|default:'Uploaded Image' }}" data-full="{{ photo.image.url }}" />
+  {% elif photo.optimized_image %}
+  <img loading="lazy" src="{{ photo.optimized_image.url }}" alt="{{ photo.alt_text|default:photo.title|default:'Uploaded Image' }}" data-full="{{ photo.optimized_image.url }}" />
   {% elif photo.image %}
-  <img loading="lazy" src="{{ photo.image.url }}" alt="{{ photo.image.name|default:'Uploaded Image' }}" data-full="{{ photo.image.url }}" />
+  <img loading="lazy" src="{{ photo.image.url }}" alt="{{ photo.alt_text|default:photo.title|default:'Uploaded Image' }}" data-full="{{ photo.image.url }}" />
   {% else %}
   <div class="no-image-placeholder">Image unavailable</div>
   {% endif %}

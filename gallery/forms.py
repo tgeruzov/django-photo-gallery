@@ -1,8 +1,8 @@
-import os
 from django import forms
 from django.core.validators import FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.conf import settings
+from .constants import ALLOWED_IMAGE_EXTENSIONS as DEFAULT_ALLOWED_IMAGE_EXTENSIONS
 
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
@@ -14,15 +14,19 @@ class MultipleFileField(forms.FileField):
 
     def clean(self, data, initial=None):
         single_file_clean = super().clean
+        if not data:
+            if self.required:
+                raise ValidationError(self.error_messages['required'], code='required')
+            return []
         if isinstance(data, (list, tuple)):
             result = [single_file_clean(d, initial) for d in data]
             return result
-        return [single_file_clean(data, initial)] if data else []
+        return [single_file_clean(data, initial)]
 
 def validate_file_size(uploaded_file):
     """Проверяет размер файла - максимум 100МБ"""
-    limit_mb = 100
-    limit_bytes = getattr(settings, 'MAX_UPLOAD_SIZE_MB', limit_mb) * 1024 * 1024
+    limit_mb = getattr(settings, 'MAX_UPLOAD_SIZE_MB', 100)
+    limit_bytes = limit_mb * 1024 * 1024
     if uploaded_file.size > limit_bytes:
         raise ValidationError(f'Файл слишком большой ({uploaded_file.size // 1024 // 1024}MB). Максимум: {limit_mb}MB')
 
@@ -40,16 +44,11 @@ def validate_image_type(uploaded_file):
     elif header.startswith(b'RIFF') and header[8:12] == b'WEBP':
         return  # WEBP
     
-    # Если не распознали по сигнатуре, проверяем расширение
-    ext = os.path.splitext(uploaded_file.name)[1].lower()
-    if ext in ['.jpg', '.jpeg', '.png', '.webp']:
-        return  # Доверяем расширению
-    
     raise ValidationError('Недопустимый формат файла. Разрешены только JPEG, PNG, WEBP.')
 
 class PhotoUploadForm(forms.Form):
     # TODO: добавить поддержку HEIC когда будет время
-    ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
+    ALLOWED_IMAGE_EXTENSIONS = DEFAULT_ALLOWED_IMAGE_EXTENSIONS
 
     files = MultipleFileField(
         label='Выберите файлы',
