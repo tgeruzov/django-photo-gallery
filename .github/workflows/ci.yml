@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: gallery
+          POSTGRES_USER: gallery
+          POSTGRES_PASSWORD: gallery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U gallery -d gallery"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DEBUG: "1"
+      SECRET_KEY: "ci-secret-key"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
+      DB_NAME: "gallery"
+      DB_USER: "gallery"
+      DB_PASSWORD: "gallery"
+      DB_HOST: "127.0.0.1"
+      DB_PORT: "5432"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run migrations
+        run: python manage.py migrate
+
+      - name: Run tests
+        run: python manage.py test

@@ -15,7 +15,7 @@
 
 - **Backend**: Django 3.2
 - **Frontend**: Vanilla JavaScript, CSS3, HTML5
-- **База данных**: SQLite (разработка) / MySQL/PostgreSQL (продакшн)
+- **База данных**: PostgreSQL
 - **Обработка изображений**: Pillow
 - **Статические файлы**: WhiteNoise
 - **Деплой**: Gunicorn
@@ -26,17 +26,36 @@
 
 - Python 3.8 или выше
 - pip (менеджер пакетов Python)
+- PostgreSQL 14+ (или Docker для запуска Postgres в контейнере)
 
 ### Установка и запуск
 
 1. **Клонируйте репозиторий**
 
    ```bash
-   git clone https://github.com/timurgeruzov/photogallery.git
-   cd photogallery
+   git clone https://github.com/tgeruzov/django-photo-gallery.git
+   cd django-photo-gallery
    ```
 
-2. **Создайте виртуальное окружение**
+2. **Создайте `.env`**
+
+   ```bash
+   # Linux/Mac
+   cp .env.example .env
+
+   # Windows PowerShell
+   Copy-Item .env.example .env
+   ```
+
+3. **Запуск через Docker (рекомендуется)**
+
+   ```bash
+   docker compose up --build
+   ```
+
+   Приложение будет доступно на `http://localhost:8000`.
+
+4. **Локальный запуск (без Docker)**
 
    ```bash
    python -m venv .venv
@@ -48,40 +67,23 @@
    source .venv/bin/activate
    ```
 
-3. **Установите зависимости**
-
-   ```bash
+   # Установите зависимости
    pip install -r requirements.txt
-   ```
 
-4. **Примените миграции**
-
-   ```bash
+   # Убедитесь, что PostgreSQL запущен и доступен по DB_HOST/DB_PORT из .env
    python manage.py migrate
-   ```
 
-5. **Создайте суперпользователя (опционально)**
-
-   ```bash
+   # Опционально
    python manage.py createsuperuser
-   ```
 
-6. **Запустите сервер разработки**
-
-   ```bash
+   # Запуск сервера
    python manage.py runserver
-   ```
-
-7. **Откройте в браузере**
-
-   ```text
-   http://localhost:8000
    ```
 
 ## 📁 Структура проекта
 
 ```text
-timur-geruzov/
+django-photo-gallery/
 ├── config/                 # Настройки Django проекта
 │   ├── settings.py        # Конфигурация
 │   ├── urls.py           # Главные URL-ы
@@ -144,7 +146,7 @@ OPTIMIZED_IMAGE_SIZE = (2560, 2560)   # Оптимизированные изо�
 - Установить `DEBUG = False`
 - Настроить `ALLOWED_HOSTS`
 - Использовать переменные окружения для `SECRET_KEY`
-- Настроить продакшен базу данных (MySQL/PostgreSQL)
+- Настроить продакшен базу данных PostgreSQL
 - Собрать статические файлы: `python manage.py collectstatic`
 - Настроить хостинг медиафайлов
 
@@ -160,15 +162,15 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
-# База данных MySQL
+# База данных PostgreSQL
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME'),
         'USER': os.environ.get('DB_USER'),
         'PASSWORD': os.environ.get('DB_PASSWORD'),
         'HOST': os.environ.get('DB_HOST'),
-        'PORT': '3306',
+        'PORT': '5432',
     }
 }
 ```

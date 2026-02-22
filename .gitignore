@@ -8,6 +8,11 @@ venv/
 # Файлы Python
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
 
 # Медиа файлы (загруженные пользователями)
 media/
@@ -20,3 +25,8 @@ project_code.txt
 
 # Переменные окружения
 .env
+
+# IDE и OS артефакты
+.idea/
+.vscode/
+.DS_Store
