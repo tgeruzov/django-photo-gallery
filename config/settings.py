@@ -76,13 +76,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
-    'default': {}
-}
-
-db_engine = os.environ.get("DB_ENGINE", "sqlite3").strip().lower()
-
-if db_engine in {"postgres", "postgresql"}:
-    DATABASES["default"] = {
+    "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("DB_NAME", "gallery"),
         "USER": os.environ.get("DB_USER", "gallery"),
@@ -90,23 +84,7 @@ if db_engine in {"postgres", "postgresql"}:
         "HOST": os.environ.get("DB_HOST", "localhost"),
         "PORT": os.environ.get("DB_PORT", "5432"),
     }
-elif db_engine in {"mysql", "mariadb"}:
-    import pymysql
-
-    pymysql.install_as_MySQLdb()
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.environ.get("DB_NAME", "gallery"),
-        "USER": os.environ.get("DB_USER", "gallery"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "3306"),
-    }
-else:
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / os.environ.get("SQLITE_NAME", "db.sqlite3"),
-    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
