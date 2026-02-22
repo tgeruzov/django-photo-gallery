@@ -1,180 +1,143 @@
-# Django Photo Gallery
+# Django Photo Gallery (PostgreSQL)
 
-Современная веб-галерея для демонстрации фотографий, созданная на Django. Проект включает адаптивный дизайн, систему загрузки изображений и удобный просмотр.
+[![CI](https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg)](https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
+[![Django 3.2](https://img.shields.io/badge/django-3.2-green.svg)](https://www.djangoproject.com/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
-## ✨ Возможности
+A production-ready **Django photo gallery** with **PostgreSQL**, image optimization, thumbnails, infinite scroll, and fullscreen lightbox view.
+This repository is configured for GitHub CI and community collaboration.
 
-- **📱 Адаптивный интерфейс** — Оптимальное отображение на всех устройствах
-- **🎨 Темная/светлая тема** — Автоматическое определение системной темы с возможностью переключения
-- **🖼️ Умная галерея** — Ленивая загрузка, infinite scroll, полноэкранный просмотр
-- **📤 Загрузка изображений** — Drag & Drop интерфейс для администраторов
-- **⚡ Автоматическая оптимизация** — Конвертация в WebP, создание миниатюр
-- **🔒 Административная зона** — Управление контентом через Django Admin
+## SEO Keywords
 
-## 🛠 Технологии
+`django photo gallery`, `django image gallery`, `postgresql django project`, `webp image optimization`, `infinite scroll gallery`, `lightbox viewer`, `photo upload app`
 
-- **Backend**: Django 3.2
-- **Frontend**: Vanilla JavaScript, CSS3, HTML5
-- **База данных**: PostgreSQL
-- **Обработка изображений**: Pillow
-- **Статические файлы**: WhiteNoise
-- **Деплой**: Gunicorn
+## Features
 
-## 🚀 Быстрый старт
+- Responsive masonry-style gallery layout
+- Infinite scroll with JSON pagination
+- Fullscreen lightbox with keyboard and mobile gestures
+- Multi-file upload for staff users
+- Automatic image optimization and thumbnail generation
+- Dark/light theme toggle
+- PostgreSQL-only backend setup
+- Docker and local development flows
 
-### Предварительные требования
+## Tech Stack
 
-- Python 3.8 или выше
-- pip (менеджер пакетов Python)
-- PostgreSQL 14+ (или Docker для запуска Postgres в контейнере)
+- Backend: Django 3.2
+- Database: PostgreSQL
+- Frontend: Vanilla JS, HTML, CSS
+- Image processing: Pillow
+- Static files: WhiteNoise
+- App server: Gunicorn
 
-### Установка и запуск
+## Quick Start
 
-1. **Клонируйте репозиторий**
+### Requirements
 
-   ```bash
-   git clone https://github.com/tgeruzov/django-photo-gallery.git
-   cd django-photo-gallery
-   ```
+- Python 3.8+
+- PostgreSQL 14+ (or Docker)
+- pip
 
-2. **Создайте `.env`**
+### 1. Clone the repository
 
-   ```bash
-   # Linux/Mac
-   cp .env.example .env
+```bash
+git clone https://github.com/tgeruzov/django-photo-gallery.git
+cd django-photo-gallery
+```
 
-   # Windows PowerShell
-   Copy-Item .env.example .env
-   ```
+### 2. Create environment file
 
-3. **Запуск через Docker (рекомендуется)**
+```bash
+# Linux/Mac
+cp .env.example .env
 
-   ```bash
-   docker compose up --build
-   ```
+# Windows PowerShell
+Copy-Item .env.example .env
+```
 
-   Приложение будет доступно на `http://localhost:8000`.
+### 3. Run with Docker (recommended)
 
-4. **Локальный запуск (без Docker)**
+```bash
+docker compose up --build
+```
 
-   ```bash
-   python -m venv .venv
+App will be available at `http://localhost:8000`.
 
-   # Активация для Windows:
-   .venv\Scripts\activate
+### 4. Run locally (without Docker)
 
-   # Активация для Linux/Mac:
-   source .venv/bin/activate
-   ```
+```bash
+python -m venv .venv
+```
 
-   # Установите зависимости
-   pip install -r requirements.txt
+```bash
+# Windows
+.venv\Scripts\activate
 
-   # Убедитесь, что PostgreSQL запущен и доступен по DB_HOST/DB_PORT из .env
-   python manage.py migrate
+# Linux/Mac
+source .venv/bin/activate
+```
 
-   # Опционально
-   python manage.py createsuperuser
+```bash
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py createsuperuser  # optional
+python manage.py runserver
+```
 
-   # Запуск сервера
-   python manage.py runserver
-   ```
+## Environment Variables
 
-## 📁 Структура проекта
+Use `.env.example` as a template:
+
+- `DEBUG`
+- `SECRET_KEY`
+- `ALLOWED_HOSTS`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_HOST`
+- `DB_PORT`
+- `MAX_UPLOAD_SIZE_MB`
+- `MAX_IMAGE_PIXELS`
+- `MAX_JSON_PAGE_SIZE`
+- `DELETE_ORIGINAL_AFTER_OPTIMIZE`
+
+## Main Routes
+
+- `/` - gallery index
+- `/upload/` - multi-file upload page (staff only)
+- `/all_photos.json` - paginated JSON endpoint for all photos
+- `/admin/` - Django admin
+
+## Project Structure
 
 ```text
 django-photo-gallery/
-├── config/                 # Настройки Django проекта
-│   ├── settings.py        # Конфигурация
-│   ├── urls.py           # Главные URL-ы
-│   └── wsgi.py           # WSGI конфигурация
-├── gallery/               # Основное приложение
-│   ├── models.py         # Модели базы данных
-│   ├── views.py          # Представления
-│   ├── forms.py          # Формы загрузки
-│   ├── tasks.py          # Обработка изображений
-│   └── templates/        # HTML шаблоны
-├── static/               # Статические файлы
-│   ├── css/styles.css    # Стили
-│   └── js/script.js      # JavaScript
-├── manage.py             # Скрипт управления Django
-└── requirements.txt      # Зависимости проекта
+├── config/
+├── gallery/
+├── static/
+├── .github/workflows/
+├── manage.py
+├── docker-compose.yml
+└── requirements.txt
 ```
 
-## 👨‍💼 Административные функции
+## Production Notes
 
-Для доступа к функциям администрирования:
+- Set `DEBUG=False`
+- Configure `ALLOWED_HOSTS`
+- Set a secure `SECRET_KEY`
+- Use PostgreSQL credentials from environment
+- Run `python manage.py collectstatic`
+- Configure media storage and backup policy
 
-- Войдите как суперпользователь
-- Перейдите на `/upload` для загрузки изображений
-- Используйте `/admin` для полного управления контентом
+## Community and Collaboration
 
-### Возможности администратора:
+- Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Security policy: [`SECURITY.md`](SECURITY.md)
+- Code of Conduct: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 
-- Множественная загрузка изображений
-- Автоматическое создание миниатюр
-- Оптимизация изображений
-- Управление метаданными фотографий
+## License
 
-## 🎨 Кастомизация
-
-### Настройка размеров изображений
-
-Отредактируйте `gallery/constants.py`:
-
-```python
-THUMBNAIL_SIZE = (800, 800)           # Размер миниатюр
-OPTIMIZED_IMAGE_SIZE = (2560, 2560)   # Оптимизированные изображения
-```
-
-### Изменение цветовой схемы
-
-Настройте CSS переменные в `static/css/styles.css`:
-
-```css
-:root {
-  --accent-color: #56b2da; /* Основной цвет */
-  --bg-color: #1a1a1a; /* Фон темной темы */
-  --text-color: #f7f7f7; /* Текст темной темы */
-}
-```
-
-## 🌐 Деплой в продакшен
-
-### Чеклист для продакшена
-
-- Установить `DEBUG = False`
-- Настроить `ALLOWED_HOSTS`
-- Использовать переменные окружения для `SECRET_KEY`
-- Настроить продакшен базу данных PostgreSQL
-- Собрать статические файлы: `python manage.py collectstatic`
-- Настроить хостинг медиафайлов
-
-### Пример настроек для продакшена
-
-```python
-# config/settings.py
-DEBUG = False
-ALLOWED_HOSTS = ['yourdomain.com', 'www.yourdomain.com']
-
-# Безопасность
-SECRET_KEY = os.environ.get('SECRET_KEY')
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
-
-# База данных PostgreSQL
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME'),
-        'USER': os.environ.get('DB_USER'),
-        'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'HOST': os.environ.get('DB_HOST'),
-        'PORT': '5432',
-    }
-}
-```
-
-## 📄 Лицензия
-
-Этот проект распространяется под лицензией MIT. Подробнее см. в файле LICENSE.
+Distributed under MIT License. See [`LICENSE`](LICENSE).
