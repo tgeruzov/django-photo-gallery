@@ -210,15 +210,25 @@ header p {
 .card {
   margin-bottom: var(--gap);
   break-inside: avoid;
+  display: block;
   opacity: 0;
   transform: scale(0.95);
   transition: opacity var(--transition-speed) ease-out, transform var(--transition-speed) ease-out, box-shadow var(--transition-speed);
   cursor: pointer;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: initial;
 }
 
 .card.loaded {
   opacity: 1;
   transform: scale(1);
+}
+
+.card.card-empty {
+  cursor: default;
 }
 
 .card img {
@@ -236,6 +246,12 @@ header p {
 .card:active img {
   transform: scale(0.98);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: var(--radius);
 }
 
 .lightbox {
@@ -285,7 +301,6 @@ header p {
   box-shadow: 0 2px 8px rgba(40, 40, 40, 0.15);
   transition: transform 0.2s ease, background 0.2s ease;
   opacity: 0.92;
-  outline: none;
   font-family: "Material Icons", "Funnel Sans", system-ui, sans-serif;
   font-style: normal;
   font-weight: normal;
@@ -307,6 +322,12 @@ header p {
   transform: translateY(-50%) scale(0.95);
   background: rgba(40, 40, 40, 0.7);
   -webkit-font-smoothing: antialiased;
+}
+
+.lightbox-prev:focus-visible,
+.lightbox-next:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
 }
 
 .lightbox-prev {
@@ -336,6 +357,12 @@ header p {
   transform: scale(0.9);
 }
 
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
 .theme-toggle-icon {
   color: var(--text-color);
   transition: color 0.3s ease;
@@ -346,11 +373,16 @@ header p {
   position: fixed;
   top: 2rem;
   right: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   cursor: pointer;
   z-index: 1000;
   transition: transform 0.1s ease;
+  text-decoration: none;
+  color: inherit;
 }
 
 .upload-toggle svg {
@@ -362,6 +394,12 @@ header p {
 
 .upload-toggle:hover {
   transform: scale(1.1);
+}
+
+.upload-toggle:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: 999px;
 }
 
 .upload-container {
@@ -432,6 +470,11 @@ header p {
 .file-upload-label:hover {
   border-color: var(--accent-color);
   background-color: rgba(86, 178, 218, 0.1);
+}
+
+.file-upload-wrapper.dragover .file-upload-label {
+  border-color: var(--accent-color);
+  background-color: rgba(86, 178, 218, 0.14);
 }
 
 .file-upload-icon {
@@ -538,6 +581,8 @@ header p {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .remove-preview:hover {
@@ -548,6 +593,11 @@ header p {
 .remove-preview:active {
   background: rgba(180, 40, 50, 0.85);
   box-shadow: 0 4px 12px rgba(180, 40, 50, 0.3);
+}
+
+.remove-preview:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
 }
 
 .no-images-message-icon {
@@ -597,13 +647,27 @@ header p {
 @media (max-width: 600px) {
   .theme-toggle,
   .upload-toggle {
-    top: 0.5rem;
+    top: 0.75rem;
+    transform: none;
+    position: fixed;
+    z-index: 1100;
+    display: flex;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: rgba(245, 245, 245, 0.88);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  body:not(.light) .theme-toggle,
+  body:not(.light) .upload-toggle {
+    background: rgba(40, 40, 40, 0.72);
+  }
+
+  .theme-toggle {
     left: 0.5rem;
     right: auto;
-    transform: none;
-    position: absolute;
-    z-index: 10;
-    display: none !important;
   }
 
   .upload-toggle {

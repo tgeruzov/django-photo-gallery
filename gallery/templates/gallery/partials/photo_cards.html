@@ -1,17 +1,27 @@
 {% load static %} {% for photo in photos %}
-<div class="card">
+{% with photo_label=photo.alt_text|default:photo.title|default:'Uploaded Image' %}
   {% if photo.thumbnail and photo.optimized_image %}
-  <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo.alt_text|default:photo.title|default:'Uploaded Image' }}" data-full="{{ photo.optimized_image.url }}" />
+  <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
+    <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo_label }}" data-full="{{ photo.optimized_image.url }}" />
+  </button>
   {% elif photo.thumbnail and photo.image %}
-  <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo.alt_text|default:photo.title|default:'Uploaded Image' }}" data-full="{{ photo.image.url }}" />
+  <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
+    <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo_label }}" data-full="{{ photo.image.url }}" />
+  </button>
   {% elif photo.optimized_image %}
-  <img loading="lazy" src="{{ photo.optimized_image.url }}" alt="{{ photo.alt_text|default:photo.title|default:'Uploaded Image' }}" data-full="{{ photo.optimized_image.url }}" />
+  <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
+    <img loading="lazy" src="{{ photo.optimized_image.url }}" alt="{{ photo_label }}" data-full="{{ photo.optimized_image.url }}" />
+  </button>
   {% elif photo.image %}
-  <img loading="lazy" src="{{ photo.image.url }}" alt="{{ photo.alt_text|default:photo.title|default:'Uploaded Image' }}" data-full="{{ photo.image.url }}" />
+  <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
+    <img loading="lazy" src="{{ photo.image.url }}" alt="{{ photo_label }}" data-full="{{ photo.image.url }}" />
+  </button>
   {% else %}
-  <div class="no-image-placeholder">Image unavailable</div>
+  <div class="card card-empty">
+    <div class="no-image-placeholder">Image unavailable</div>
+  </div>
   {% endif %}
-</div>
+{% endwith %}
 {% empty %} {% if not request.GET.page or request.GET.page == '1' %}
 <div class="no-images-message-icon">Нет загруженных изображений</div>
 {% endif %} {% endfor %}

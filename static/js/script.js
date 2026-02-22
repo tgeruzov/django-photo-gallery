@@ -13,6 +13,12 @@ function setupThemeSwitcher() {
   const themeBtn = document.querySelector('.theme-toggle');
   if (!themeBtn) return;
 
+  const syncThemeButtonState = () => {
+      const isLight = document.body.classList.contains('light');
+      themeBtn.setAttribute('aria-pressed', String(isLight));
+      themeBtn.setAttribute('aria-label', isLight ? 'Переключить на темную тему' : 'Переключить на светлую тему');
+  };
+
   const savedTheme = localStorage.getItem('darkMode');
   if (savedTheme === null) {
       if (window.matchMedia('(prefers-color-scheme: light)').matches) {
@@ -21,11 +27,13 @@ function setupThemeSwitcher() {
   } else if (savedTheme === 'false') {
       document.body.classList.add('light');
   }
+  syncThemeButtonState();
 
   themeBtn.addEventListener('click', () => {
       document.body.classList.toggle('light');
       const isLight = document.body.classList.contains('light');
       localStorage.setItem('darkMode', !isLight);
+      syncThemeButtonState();
   });
 }
 
@@ -54,45 +62,83 @@ function initLightbox() {
   const gallery = document.getElementById('gallery');
   if (!lightbox || !lightboxImg || !gallery) return;
 
-  let allPhotos = [];
+  const allPhotosUrl = gallery.dataset.allPhotosUrl || '/all_photos.json';
+  let allPhotos = getVisiblePhotos();
+  let allPhotosPromise = null;
   let currentIndex = -1;
 
-  // Загружаем все фото постранично
-  fetchAllPhotos()
-    .then(photos => {
-        allPhotos = photos;
-    })
-    .catch(() => {
-        // Фолбэк на видимые фото
-        allPhotos = Array.from(gallery.querySelectorAll('.card img')).map(img => ({
-            url: img.src,
-            full_url: img.getAttribute('data-full'),
-            title: img.alt
-        }));
-    });
+  function getVisiblePhotos() {
+    return Array.from(gallery.querySelectorAll('.card img'))
+      .map(img => ({
+          url: img.src,
+          full_url: img.getAttribute('data-full'),
+          title: img.alt || '',
+      }))
+      .filter(photo => photo.url && photo.full_url);
+  }
+
+  function ensureAllPhotosLoaded() {
+    if (allPhotosPromise) return allPhotosPromise;
+
+    allPhotosPromise = fetchAllPhotos(allPhotosUrl)
+      .then(photos => {
+          if (Array.isArray(photos) && photos.length) {
+              allPhotos = photos;
+          }
+          return allPhotos;
+      })
+      .catch(() => {
+          // Фолбэк на локально видимые фото и возможность повторной попытки позже
+          allPhotos = getVisiblePhotos();
+          allPhotosPromise = null;
+          return allPhotos;
+      });
+
+    return allPhotosPromise;
+  }
 
   function showPhoto(index) {
     if (index < 0 || index >= allPhotos.length) return;
     currentIndex = index;
     lightboxImg.src = allPhotos[index].full_url;
+    lightboxImg.alt = allPhotos[index].title || 'Увеличенное изображение';
     lightbox.classList.add('active');
     showSwipeHint();
   }
 
-  gallery.addEventListener('click', function(e) {
-    const img = e.target.closest('.card img');
-    if (img) {
-        const fullUrl = img.getAttribute('data-full');
-        let index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
-        if (index === -1) {
-            allPhotos = Array.from(gallery.querySelectorAll('.card img')).map(node => ({
-                url: node.src,
-                full_url: node.getAttribute('data-full'),
-                title: node.alt || '',
-            }));
-            index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
+  function openFromImage(img) {
+    const fullUrl = img ? img.getAttribute('data-full') : '';
+    if (!fullUrl) return;
+
+    if (!allPhotos.length) {
+        allPhotos = getVisiblePhotos();
+    }
+
+    let index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
+    if (index === -1) {
+        allPhotos = getVisiblePhotos();
+        index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
+    }
+
+    if (index === -1) return;
+    showPhoto(index);
+
+    ensureAllPhotosLoaded().then(photos => {
+        if (!lightbox.classList.contains('active')) return;
+        const refreshedIndex = photos.findIndex(photo => photo.full_url === fullUrl);
+        if (refreshedIndex !== -1) {
+            currentIndex = refreshedIndex;
         }
-        if (index !== -1) showPhoto(index);
+    });
+  }
+
+  gallery.addEventListener('click', function(e) {
+    const card = e.target.closest('.card');
+    if (!card || !gallery.contains(card)) return;
+
+    const img = card.querySelector('img');
+    if (img) {
+        openFromImage(img);
     }
   });
 
@@ -131,9 +177,7 @@ function initLightbox() {
   });
 
   // Свайпы на мобильных
-  if (window.innerWidth <= 600) {
-    setupSwipe(lightbox, prevPhoto, nextPhoto);
-  }
+  setupSwipe(lightbox, prevPhoto, nextPhoto);
 
   // Клики по картинке на мобильных
   lightboxImg.addEventListener('click', function(e) {
@@ -164,6 +208,9 @@ function setupInfiniteScroll(gallery, observer) {
                 'X-Requested-With': 'XMLHttpRequest',
             },
         });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
         const data = await response.json();
         
         if (Array.isArray(data.photos) && data.photos.length) {
@@ -173,9 +220,12 @@ function setupInfiniteScroll(gallery, observer) {
                 gallery.appendChild(card);
                 if (observer) observer.observe(card);
             });
-            page++;
         }
         hasMore = Boolean(data.has_next);
+        if (hasMore) {
+            const apiPage = Number(data.page);
+            page = Number.isFinite(apiPage) && apiPage > 0 ? apiPage + 1 : page + 1;
+        }
     } catch (err) {
         console.error('Ошибка загрузки:', err);
     } finally {
@@ -265,9 +315,11 @@ function initUploadForm() {
           img.className = 'preview-image';
           img.alt = file.name;
           
-          const removeBtn = document.createElement('div');
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
           removeBtn.className = 'remove-preview';
-          removeBtn.innerHTML = '×';
+          removeBtn.setAttribute('aria-label', `Удалить ${file.name}`);
+          removeBtn.textContent = '×';
           removeBtn.addEventListener('click', () => {
               selectedFiles.splice(i, 1);
               updateFileInput();
@@ -351,10 +403,12 @@ function setupSwipe(lightbox, prev, next) {
   let startX = null;
   
   lightbox.addEventListener('touchstart', function(e) {
+      if (window.innerWidth > 600) return;
       if (e.touches.length === 1) startX = e.touches[0].clientX;
   });
   
   lightbox.addEventListener('touchend', function(e) {
+      if (window.innerWidth > 600) return;
       if (startX === null) return;
       const endX = e.changedTouches[0].clientX;
       const diff = endX - startX;
@@ -388,8 +442,10 @@ function showSwipeHint() {
 function createGalleryCard(photo) {
   if (!photo || !photo.url || !photo.full_url) return null;
 
-  const card = document.createElement('div');
+  const card = document.createElement('button');
+  card.type = 'button';
   card.className = 'card';
+  card.setAttribute('aria-label', `Открыть фото: ${photo.title || 'Без названия'}`);
 
   const img = document.createElement('img');
   img.loading = 'lazy';
@@ -401,14 +457,23 @@ function createGalleryCard(photo) {
   return card;
 }
 
-async function fetchAllPhotos() {
+function buildUrlWithQuery(basePath, params) {
+  const url = new URL(basePath, window.location.href);
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, String(value));
+  });
+  return url.toString();
+}
+
+async function fetchAllPhotos(basePath) {
   const allPhotos = [];
   let page = 1;
   let hasNext = true;
   const pageSize = 100;
 
   while (hasNext) {
-    const response = await fetch(`/all_photos.json?page=${page}&page_size=${pageSize}`, {
+    const url = buildUrlWithQuery(basePath, { page, page_size: pageSize });
+    const response = await fetch(url, {
       headers: { Accept: 'application/json' },
     });
 

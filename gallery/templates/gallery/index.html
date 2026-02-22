@@ -6,7 +6,7 @@
   {% endfor %}
 </div>
 {% endif %}
-<div class="gallery" id="gallery">{% include "gallery/partials/photo_cards.html" with photos=photos_page %}</div>
+<div class="gallery" id="gallery" data-all-photos-url="{% url 'all_photos_json' %}">{% include "gallery/partials/photo_cards.html" with photos=photos_page %}</div>
 <div class="lightbox" id="lightbox">
   <button class="lightbox-prev" aria-label="Предыдущее фото">
     <span class="material-icons">chevron_left</span>
