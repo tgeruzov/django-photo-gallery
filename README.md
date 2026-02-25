@@ -1,143 +1,167 @@
-# Django Photo Gallery (PostgreSQL)
+<h1 align="center">Django Photo Gallery</h1>
 
-[![CI](https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg)](https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml)
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
-[![Django 3.2](https://img.shields.io/badge/django-3.2-green.svg)](https://www.djangoproject.com/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <strong>Production-ready gallery on Django + PostgreSQL with image optimization, infinite scroll, and fullscreen lightbox.</strong>
+</p>
 
-A production-ready **Django photo gallery** with **PostgreSQL**, image optimization, thumbnails, infinite scroll, and fullscreen lightbox view.
-This repository is configured for GitHub CI and community collaboration.
+<p align="center">
+  <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
+  </a>
+  <a href="https://www.python.org/">
+    <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white">
+  </a>
+  <a href="https://www.djangoproject.com/">
+    <img alt="Django 3.2" src="https://img.shields.io/badge/django-3.2-0C4B33?logo=django&logoColor=white">
+  </a>
+  <a href="LICENSE">
+    <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-ffd43b">
+  </a>
+</p>
 
-## SEO Keywords
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#environment-variables">Environment</a> •
+  <a href="#routes">Routes</a> •
+  <a href="#community">Community</a>
+</p>
 
-`django photo gallery`, `django image gallery`, `postgresql django project`, `webp image optimization`, `infinite scroll gallery`, `lightbox viewer`, `photo upload app`
+<hr>
 
-## Features
+<h2 id="features">Features</h2>
 
-- Responsive masonry-style gallery layout
-- Infinite scroll with JSON pagination
-- Fullscreen lightbox with keyboard and mobile gestures
-- Multi-file upload for staff users
-- Automatic image optimization and thumbnail generation
-- Dark/light theme toggle
-- PostgreSQL-only backend setup
-- Docker and local development flows
+<table>
+  <tr>
+    <td>Responsive masonry-style gallery</td>
+    <td>Fullscreen lightbox (keyboard + mobile gestures)</td>
+  </tr>
+  <tr>
+    <td>Infinite scroll with JSON pagination</td>
+    <td>Staff-only multi-file upload</td>
+  </tr>
+  <tr>
+    <td>Automatic optimization + thumbnails</td>
+    <td>Dark/light theme toggle</td>
+  </tr>
+  <tr>
+    <td>PostgreSQL-first backend</td>
+    <td>Docker and local dev workflows</td>
+  </tr>
+</table>
 
-## Tech Stack
+<h2>Tech Stack</h2>
 
-- Backend: Django 3.2
-- Database: PostgreSQL
-- Frontend: Vanilla JS, HTML, CSS
-- Image processing: Pillow
-- Static files: WhiteNoise
-- App server: Gunicorn
+<ul>
+  <li><strong>Backend:</strong> Django 3.2</li>
+  <li><strong>Database:</strong> PostgreSQL 16 (Docker image: <code>postgres:16-alpine</code>)</li>
+  <li><strong>Frontend:</strong> Vanilla JS, HTML, CSS</li>
+  <li><strong>Image Processing:</strong> Pillow</li>
+  <li><strong>Static Files:</strong> WhiteNoise</li>
+  <li><strong>WSGI Server:</strong> Gunicorn</li>
+</ul>
 
-## Quick Start
+<h2 id="quick-start">Quick Start</h2>
 
-### Requirements
+<h3>Requirements</h3>
+<ul>
+  <li>Python 3.8+</li>
+  <li>PostgreSQL 14+ (or Docker)</li>
+  <li>pip</li>
+</ul>
 
-- Python 3.8+
-- PostgreSQL 14+ (or Docker)
-- pip
+<h3>1) Clone</h3>
 
-### 1. Clone the repository
+<pre><code>git clone https://github.com/tgeruzov/django-photo-gallery.git
+cd django-photo-gallery</code></pre>
 
-```bash
-git clone https://github.com/tgeruzov/django-photo-gallery.git
-cd django-photo-gallery
-```
+<h3>2) Create .env</h3>
 
-### 2. Create environment file
-
-```bash
-# Linux/Mac
+<pre><code># Linux / Mac
 cp .env.example .env
 
 # Windows PowerShell
-Copy-Item .env.example .env
-```
+Copy-Item .env.example .env</code></pre>
 
-### 3. Run with Docker (recommended)
+<h3>3) Run with Docker (recommended)</h3>
 
-```bash
-docker compose up --build
-```
+<pre><code>docker compose up --build</code></pre>
 
-App will be available at `http://localhost:8000`.
+<p>Open: <a href="http://localhost:8000">http://localhost:8000</a></p>
 
-### 4. Run locally (without Docker)
+<h3>4) Run locally (without Docker)</h3>
 
-```bash
-python -m venv .venv
-```
+<pre><code>python -m venv .venv
 
-```bash
 # Windows
 .venv\Scripts\activate
 
-# Linux/Mac
+# Linux / Mac
 source .venv/bin/activate
-```
 
-```bash
 pip install -r requirements.txt
 python manage.py migrate
-python manage.py createsuperuser  # optional
-python manage.py runserver
-```
+python manage.py createsuperuser
+python manage.py runserver</code></pre>
 
-## Environment Variables
+<h2 id="environment-variables">Environment Variables</h2>
 
-Use `.env.example` as a template:
+<p>Use <code>.env.example</code> as template:</p>
 
-- `DEBUG`
-- `SECRET_KEY`
-- `ALLOWED_HOSTS`
-- `DB_NAME`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_HOST`
-- `DB_PORT`
-- `MAX_UPLOAD_SIZE_MB`
-- `MAX_IMAGE_PIXELS`
-- `MAX_JSON_PAGE_SIZE`
-- `DELETE_ORIGINAL_AFTER_OPTIMIZE`
+<p>
+  <code>DEBUG</code>,
+  <code>SECRET_KEY</code>,
+  <code>ALLOWED_HOSTS</code>,
+  <code>DB_NAME</code>,
+  <code>DB_USER</code>,
+  <code>DB_PASSWORD</code>,
+  <code>DB_HOST</code>,
+  <code>DB_PORT</code>,
+  <code>MAX_UPLOAD_SIZE_MB</code>,
+  <code>MAX_IMAGE_PIXELS</code>,
+  <code>MAX_JSON_PAGE_SIZE</code>,
+  <code>DELETE_ORIGINAL_AFTER_OPTIMIZE</code>
+</p>
 
-## Main Routes
+<h2 id="routes">Main Routes</h2>
 
-- `/` - gallery index
-- `/upload/` - multi-file upload page (staff only)
-- `/all_photos.json` - paginated JSON endpoint for all photos
-- `/admin/` - Django admin
+<ul>
+  <li><code>/</code> - gallery index</li>
+  <li><code>/upload/</code> - multi-file upload page (staff only)</li>
+  <li><code>/all_photos.json</code> - paginated JSON endpoint</li>
+  <li><code>/admin/</code> - Django admin</li>
+</ul>
 
-## Project Structure
+<h2>Project Structure</h2>
 
-```text
-django-photo-gallery/
+<pre><code>django-photo-gallery/
 ├── config/
 ├── gallery/
 ├── static/
 ├── .github/workflows/
 ├── manage.py
 ├── docker-compose.yml
-└── requirements.txt
-```
+└── requirements.txt</code></pre>
 
-## Production Notes
+<h2>Production Notes</h2>
 
-- Set `DEBUG=False`
-- Configure `ALLOWED_HOSTS`
-- Set a secure `SECRET_KEY`
-- Use PostgreSQL credentials from environment
-- Run `python manage.py collectstatic`
-- Configure media storage and backup policy
+<ul>
+  <li>Set <code>DEBUG=False</code></li>
+  <li>Configure <code>ALLOWED_HOSTS</code></li>
+  <li>Use strong <code>SECRET_KEY</code></li>
+  <li>Inject PostgreSQL credentials via environment</li>
+  <li>Run <code>python manage.py collectstatic</code></li>
+  <li>Set media storage + backup policy</li>
+</ul>
 
-## Community and Collaboration
+<h2 id="community">Community</h2>
 
-- Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Security policy: [`SECURITY.md`](SECURITY.md)
-- Code of Conduct: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+<ul>
+  <li><a href="CONTRIBUTING.md">Contributing Guide</a></li>
+  <li><a href="SECURITY.md">Security Policy</a></li>
+  <li><a href="CODE_OF_CONDUCT.md">Code of Conduct</a></li>
+</ul>
 
-## License
+<h2>License</h2>
 
-Distributed under MIT License. See [`LICENSE`](LICENSE).
+<p>Distributed under MIT License. See <a href="LICENSE">LICENSE</a>.</p>
