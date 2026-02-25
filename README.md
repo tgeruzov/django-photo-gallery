@@ -1,167 +1,186 @@
 <h1 align="center">Django Photo Gallery</h1>
 
 <p align="center">
-  <strong>Production-ready gallery on Django + PostgreSQL with image optimization, infinite scroll, and fullscreen lightbox.</strong>
+  A modern Django + PostgreSQL photo gallery with infinite scroll, optimized images, and fullscreen lightbox experience.
 </p>
 
 <p align="center">
   <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
     <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
   </a>
-  <a href="https://www.python.org/">
-    <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white">
+  <a href="https://www.python.org/downloads/release/python-3110/">
+    <img alt="Python 3.11" src="https://img.shields.io/badge/Python-3.11-2F6DB3?logo=python&logoColor=white">
   </a>
   <a href="https://www.djangoproject.com/">
-    <img alt="Django 3.2" src="https://img.shields.io/badge/django-3.2-0C4B33?logo=django&logoColor=white">
+    <img alt="Django 3.2" src="https://img.shields.io/badge/Django-3.2-0C4B33?logo=django&logoColor=white">
+  </a>
+  <a href="https://www.postgresql.org/">
+    <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white">
   </a>
   <a href="LICENSE">
-    <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-ffd43b">
+    <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-F2C94C">
   </a>
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
+  <a href="#at-a-glance">At a Glance</a> •
   <a href="#quick-start">Quick Start</a> •
-  <a href="#environment-variables">Environment</a> •
-  <a href="#routes">Routes</a> •
+  <a href="#api-and-routes">API & Routes</a> •
+  <a href="#project-layout">Project Layout</a> •
   <a href="#community">Community</a>
 </p>
 
-<hr>
+---
 
-<h2 id="features">Features</h2>
+## At a Glance
 
-<table>
-  <tr>
-    <td>Responsive masonry-style gallery</td>
-    <td>Fullscreen lightbox (keyboard + mobile gestures)</td>
-  </tr>
-  <tr>
-    <td>Infinite scroll with JSON pagination</td>
-    <td>Staff-only multi-file upload</td>
-  </tr>
-  <tr>
-    <td>Automatic optimization + thumbnails</td>
-    <td>Dark/light theme toggle</td>
-  </tr>
-  <tr>
-    <td>PostgreSQL-first backend</td>
-    <td>Docker and local dev workflows</td>
-  </tr>
-</table>
+| Capability | Details |
+| --- | --- |
+| Gallery UX | Masonry-style grid with lazy reveal and infinite scroll |
+| Viewing | Fullscreen lightbox with keyboard and mobile swipe navigation |
+| Upload | Multi-file upload for staff users with drag-and-drop |
+| Image pipeline | Original + optimized + thumbnail generated on upload |
+| API | Paginated JSON endpoint for full gallery data |
+| Deployment | Docker Compose and local setup workflows |
+| CI | GitHub Actions: migrate + Django tests |
 
-<h2>Tech Stack</h2>
+## Stack
 
-<ul>
-  <li><strong>Backend:</strong> Django 3.2</li>
-  <li><strong>Database:</strong> PostgreSQL 16 (Docker image: <code>postgres:16-alpine</code>)</li>
-  <li><strong>Frontend:</strong> Vanilla JS, HTML, CSS</li>
-  <li><strong>Image Processing:</strong> Pillow</li>
-  <li><strong>Static Files:</strong> WhiteNoise</li>
-  <li><strong>WSGI Server:</strong> Gunicorn</li>
-</ul>
+| Layer | Technology |
+| --- | --- |
+| Backend | Django 3.2 |
+| Database | PostgreSQL (Docker uses `postgres:16-alpine`) |
+| Frontend | Vanilla JS + HTML + CSS |
+| Image processing | Pillow |
+| Static serving | WhiteNoise (enabled when `DEBUG=False`) |
+| App server | Gunicorn |
 
-<h2 id="quick-start">Quick Start</h2>
+## Quick Start
 
-<h3>Requirements</h3>
-<ul>
-  <li>Python 3.8+</li>
-  <li>PostgreSQL 14+ (or Docker)</li>
-  <li>pip</li>
-</ul>
+### 1) Clone repository
 
-<h3>1) Clone</h3>
+```bash
+git clone https://github.com/tgeruzov/django-photo-gallery.git
+cd django-photo-gallery
+```
 
-<pre><code>git clone https://github.com/tgeruzov/django-photo-gallery.git
-cd django-photo-gallery</code></pre>
+### 2) Create environment file
 
-<h3>2) Create .env</h3>
-
-<pre><code># Linux / Mac
+```bash
+# Linux / macOS
 cp .env.example .env
 
 # Windows PowerShell
-Copy-Item .env.example .env</code></pre>
+Copy-Item .env.example .env
+```
 
-<h3>3) Run with Docker (recommended)</h3>
+### 3) Run with Docker (recommended)
 
-<pre><code>docker compose up --build</code></pre>
+```bash
+docker compose up --build
+```
 
-<p>Open: <a href="http://localhost:8000">http://localhost:8000</a></p>
+Open [http://localhost:8000](http://localhost:8000)
 
-<h3>4) Run locally (without Docker)</h3>
+<details>
+<summary><strong>Run locally (without Docker)</strong></summary>
 
-<pre><code>python -m venv .venv
+```bash
+python -m venv .venv
+```
 
+```bash
 # Windows
 .venv\Scripts\activate
 
-# Linux / Mac
+# Linux / macOS
 source .venv/bin/activate
+```
 
+```bash
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py createsuperuser
-python manage.py runserver</code></pre>
+python manage.py runserver
+```
+</details>
 
-<h2 id="environment-variables">Environment Variables</h2>
+## Environment Variables
 
-<p>Use <code>.env.example</code> as template:</p>
+Use `.env.example` as a base:
 
-<p>
-  <code>DEBUG</code>,
-  <code>SECRET_KEY</code>,
-  <code>ALLOWED_HOSTS</code>,
-  <code>DB_NAME</code>,
-  <code>DB_USER</code>,
-  <code>DB_PASSWORD</code>,
-  <code>DB_HOST</code>,
-  <code>DB_PORT</code>,
-  <code>MAX_UPLOAD_SIZE_MB</code>,
-  <code>MAX_IMAGE_PIXELS</code>,
-  <code>MAX_JSON_PAGE_SIZE</code>,
-  <code>DELETE_ORIGINAL_AFTER_OPTIMIZE</code>
-</p>
+| Variable | Purpose |
+| --- | --- |
+| `DEBUG` | Enables debug mode |
+| `SECRET_KEY` | Django secret key |
+| `ALLOWED_HOSTS` | Comma-separated hostnames |
+| `DB_NAME` | PostgreSQL database name |
+| `DB_USER` | PostgreSQL user |
+| `DB_PASSWORD` | PostgreSQL password |
+| `DB_HOST` | PostgreSQL host |
+| `DB_PORT` | PostgreSQL port |
+| `MAX_UPLOAD_SIZE_MB` | Max upload size per file |
+| `MAX_IMAGE_PIXELS` | Pixel safety guard for image parsing |
+| `MAX_JSON_PAGE_SIZE` | Max `page_size` for JSON endpoint |
+| `DELETE_ORIGINAL_AFTER_OPTIMIZE` | Deletes original after optimization if enabled |
 
-<h2 id="routes">Main Routes</h2>
+## API and Routes
 
-<ul>
-  <li><code>/</code> - gallery index</li>
-  <li><code>/upload/</code> - multi-file upload page (staff only)</li>
-  <li><code>/all_photos.json</code> - paginated JSON endpoint</li>
-  <li><code>/admin/</code> - Django admin</li>
-</ul>
+| Route | Method | Description |
+| --- | --- | --- |
+| `/` | GET | Main gallery page (supports AJAX pagination via `?page=`) |
+| `/upload/` | GET, POST | Staff-only multi-file upload page |
+| `/all_photos.json` | GET | Paginated JSON API (`page`, `page_size`) |
+| `/admin/` | GET | Django admin |
 
-<h2>Project Structure</h2>
+### Example: JSON response
 
-<pre><code>django-photo-gallery/
-├── config/
-├── gallery/
-├── static/
-├── .github/workflows/
-├── manage.py
+```json
+{
+  "photos": [
+    {
+      "id": 1,
+      "url": "/media/thumbnails/2026/02/25/image.webp",
+      "full_url": "/media/optimized/2026/02/25/image.webp",
+      "title": "My photo"
+    }
+  ],
+  "page": 1,
+  "page_size": 100,
+  "has_next": true,
+  "total": 240
+}
+```
+
+## Project Layout
+
+```text
+django-photo-gallery/
+├── config/                  # Django project settings and URLs
+├── gallery/                 # Gallery app (models, views, forms, utils)
+├── static/                  # CSS, JS, icons
+├── .github/workflows/       # CI pipeline
 ├── docker-compose.yml
-└── requirements.txt</code></pre>
+├── requirements.txt
+└── manage.py
+```
 
-<h2>Production Notes</h2>
+## Production Checklist
 
-<ul>
-  <li>Set <code>DEBUG=False</code></li>
-  <li>Configure <code>ALLOWED_HOSTS</code></li>
-  <li>Use strong <code>SECRET_KEY</code></li>
-  <li>Inject PostgreSQL credentials via environment</li>
-  <li>Run <code>python manage.py collectstatic</code></li>
-  <li>Set media storage + backup policy</li>
-</ul>
+- Set `DEBUG=False`
+- Configure strict `ALLOWED_HOSTS`
+- Use strong `SECRET_KEY`
+- Apply secure PostgreSQL credentials from environment
+- Run `python manage.py collectstatic`
+- Configure media storage and backup policy
+- Keep HTTPS enabled for secure cookies/HSTS behavior
 
-<h2 id="community">Community</h2>
+## Community
 
-<ul>
-  <li><a href="CONTRIBUTING.md">Contributing Guide</a></li>
-  <li><a href="SECURITY.md">Security Policy</a></li>
-  <li><a href="CODE_OF_CONDUCT.md">Code of Conduct</a></li>
-</ul>
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
 
-<h2>License</h2>
+## License
 
-<p>Distributed under MIT License. See <a href="LICENSE">LICENSE</a>.</p>
+Released under the MIT License. See [LICENSE](LICENSE).
