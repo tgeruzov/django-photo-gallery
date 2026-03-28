@@ -203,7 +203,7 @@ function initLightbox() {
   // Кнопки навигации
   const prevBtn = lightbox.querySelector('.lightbox-prev');
   const nextBtn = lightbox.querySelector('.lightbox-next');
-  
+
   prevBtn && prevBtn.addEventListener('click', e => { e.stopPropagation(); prevPhoto(); });
   nextBtn && nextBtn.addEventListener('click', e => { e.stopPropagation(); nextPhoto(); });
 
@@ -340,7 +340,7 @@ function initUploadForm() {
   const fileInput = document.getElementById('id_files');
   const preview = document.getElementById('preview-container');
   const submitBtn = document.getElementById('submit-btn');
-  
+
   if (!form || !fileInput || !preview || !submitBtn) return;
 
   let selectedFiles = [];
@@ -348,22 +348,22 @@ function initUploadForm() {
 
   fileInput.addEventListener('change', handleFileSelect);
   form.addEventListener('submit', handleFormSubmit);
-  
+
   // Drag and drop
   const dropZone = fileInput.closest('.file-upload-wrapper');
   if (dropZone) {
       ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
           dropZone.addEventListener(ev, preventDefaults);
       });
-      
+
       ['dragenter', 'dragover'].forEach(ev => {
           dropZone.addEventListener(ev, () => dropZone.classList.add('dragover'));
       });
-      
+
       ['dragleave', 'drop'].forEach(ev => {
           dropZone.addEventListener(ev, () => dropZone.classList.remove('dragover'));
       });
-      
+
       dropZone.addEventListener('drop', handleDrop);
   }
 
@@ -380,11 +380,11 @@ function initUploadForm() {
   function processFiles(files) {
       const validFiles = files.filter(f => f.size <= 100 * 1024 * 1024);
       const oversized = files.filter(f => f.size > 100 * 1024 * 1024);
-      
+
       if (oversized.length) {
           alert(`Слишком большие файлы:\n${oversized.map(f => `${f.name} (${Math.round(f.size/1024/1024)}MB)`).join('\n')}`);
       }
-      
+
       selectedFiles = selectedFiles.concat(validFiles);
       updateFileInput();
       renderPreviews();
@@ -398,16 +398,16 @@ function initUploadForm() {
 
   async function renderPreviews() {
       preview.innerHTML = '';
-      
+
       for (let i = 0; i < selectedFiles.length; i++) {
           const file = selectedFiles[i];
           const wrapper = document.createElement('div');
           wrapper.className = 'preview-wrapper';
-          
+
           const img = document.createElement('img');
           img.className = 'preview-image';
           img.alt = file.name;
-          
+
           const removeBtn = document.createElement('button');
           removeBtn.type = 'button';
           removeBtn.className = 'remove-preview';
@@ -418,17 +418,17 @@ function initUploadForm() {
               updateFileInput();
               renderPreviews();
           });
-          
+
           wrapper.append(img, removeBtn);
           preview.appendChild(wrapper);
-          
+
           if (file.type.startsWith('image/')) {
               img.src = await createPreview(file);
           }
-          
+
           wrapper.classList.add('loaded');
       }
-      
+
       submitBtn.disabled = selectedFiles.length === 0;
   }
 
@@ -454,10 +454,10 @@ function initUploadForm() {
   async function handleFormSubmit(e) {
       e.preventDefault();
       if (!selectedFiles.length) return;
-      
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Загружаем...';
-      
+
       try {
           const formData = new FormData(form);
           const response = await fetch(form.action, {
@@ -468,9 +468,9 @@ function initUploadForm() {
               },
               body: formData,
           });
-          
+
           const result = await response.json();
-          
+
           if (response.ok && result.success) {
               selectedFiles = [];
               updateFileInput();
@@ -494,18 +494,18 @@ function preventDefaults(e) {
 
 function setupSwipe(lightbox, prev, next) {
   let startX = null;
-  
+
   lightbox.addEventListener('touchstart', function(e) {
       if (window.innerWidth > 600) return;
       if (e.touches.length === 1) startX = e.touches[0].clientX;
   });
-  
+
   lightbox.addEventListener('touchend', function(e) {
       if (window.innerWidth > 600) return;
       if (startX === null) return;
       const endX = e.changedTouches[0].clientX;
       const diff = endX - startX;
-      
+
       if (Math.abs(diff) > 50) {
           if (diff > 0) prev();
           else next();
@@ -517,12 +517,12 @@ function setupSwipe(lightbox, prev, next) {
 function showSwipeHint() {
   const hint = document.querySelector('.lightbox-hint');
   if (!hint) return;
-  
+
   if (window.innerWidth > 600) {
       hint.style.display = 'none';
       return;
   }
-  
+
   if (!sessionStorage.getItem('hintShown')) {
       hint.style.display = 'block';
       setTimeout(() => {

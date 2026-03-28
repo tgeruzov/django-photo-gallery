@@ -12,8 +12,8 @@ Describe the change in 1-3 sentences.
 
 ## What Changed
 
-- 
-- 
+-
+-
 
 ## Validation
 
@@ -24,4 +24,3 @@ Describe the change in 1-3 sentences.
 ## Related Issues
 
 Closes #
-

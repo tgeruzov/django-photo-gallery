@@ -24,7 +24,10 @@ services:
       - .:/app
     env_file: .env
     environment:
+      DJANGO_ENV: dev
       DB_HOST: db
+      ENABLE_BACKGROUND_TASKS: 1
+      CELERY_TASK_ALWAYS_EAGER: 1
     ports:
       - "8000:8000"
     depends_on:

@@ -40,9 +40,10 @@
 | Viewing | Fullscreen lightbox with keyboard and mobile swipe navigation |
 | Upload | Multi-file upload for staff users with drag-and-drop |
 | Image pipeline | Original + optimized + thumbnail generated on upload |
+| Background jobs | Celery-ready derivative backfill with eager local fallback |
 | API | Paginated JSON endpoint for full gallery data |
 | Deployment | Docker Compose and local setup workflows |
-| CI | GitHub Actions: migrate + Django tests |
+| CI | GitHub Actions: pre-commit + migrate + Django tests |
 
 ## Stack
 
@@ -54,6 +55,7 @@
 | Image processing | Pillow |
 | Static serving | WhiteNoise (enabled when `DEBUG=False`) |
 | App server | Gunicorn |
+| Background tasks | Celery + Redis (production profile) |
 
 ## Quick Start
 
@@ -105,24 +107,59 @@ python manage.py runserver
 ```
 </details>
 
+### 4) Install developer tooling
+
+```bash
+pip install -r requirements-dev.txt
+pre-commit install
+```
+
+### 5) Production-like profile
+
+```bash
+docker compose -f docker-compose.prod.yml up --build
+```
+
+This profile runs:
+
+- Django with `DJANGO_ENV=prod`
+- Gunicorn for the web app
+- Celery worker for background jobs
+- Redis as the broker/backend
+- PostgreSQL for persistence
+- Shared named volumes for `media/` and collected static files
+
+For localhost smoke-testing this profile keeps `SECURE_SSL_REDIRECT=0` so the app remains reachable over plain HTTP. In a real deployment behind HTTPS, turn it back on.
+
 ## Environment Variables
 
 Use `.env.example` as a base:
 
 | Variable | Purpose |
 | --- | --- |
+| `DJANGO_ENV` | Selects `dev` or `prod` settings |
 | `DEBUG` | Enables debug mode |
 | `SECRET_KEY` | Django secret key |
 | `ALLOWED_HOSTS` | Comma-separated hostnames |
+| `CSRF_TRUSTED_ORIGINS` | Trusted origins for secure deployments |
+| `TIME_ZONE` | Application and Celery timezone |
 | `DB_NAME` | PostgreSQL database name |
 | `DB_USER` | PostgreSQL user |
 | `DB_PASSWORD` | PostgreSQL password |
 | `DB_HOST` | PostgreSQL host |
 | `DB_PORT` | PostgreSQL port |
+| `DB_CONN_MAX_AGE` | Persistent DB connection lifetime in seconds |
 | `MAX_UPLOAD_SIZE_MB` | Max upload size per file |
 | `MAX_IMAGE_PIXELS` | Pixel safety guard for image parsing |
 | `MAX_JSON_PAGE_SIZE` | Max `page_size` for JSON endpoint |
 | `DELETE_ORIGINAL_AFTER_OPTIMIZE` | Deletes original after optimization if enabled |
+| `ENABLE_BACKGROUND_TASKS` | Enables asynchronous derivative generation |
+| `CELERY_TASK_ALWAYS_EAGER` | Executes Celery tasks inline when enabled |
+| `CELERY_BROKER_URL` | Celery broker connection string |
+| `CELERY_RESULT_BACKEND` | Celery result backend |
+| `SECURE_SSL_REDIRECT` | Forces HTTPS redirects in production mode |
+| `SECURE_HSTS_SECONDS` | HSTS max-age for secure deployments |
+| `LOG_LEVEL` | Base log verbosity |
 
 ## API and Routes
 
@@ -156,22 +193,29 @@ Use `.env.example` as a base:
 
 ```text
 django-photo-gallery/
-├── config/                  # Django project settings and URLs
+├── config/                  # Django config, split settings, Celery wiring
 ├── gallery/                 # Gallery app (models, views, forms, utils)
 ├── static/                  # CSS, JS, icons
 ├── .github/workflows/       # CI pipeline
 ├── docker-compose.yml
+├── docker-compose.prod.yml
+├── pyproject.toml
+├── .pre-commit-config.yaml
 ├── requirements.txt
+├── requirements-dev.txt
 └── manage.py
 ```
 
 ## Production Checklist
 
+- Set `DJANGO_ENV=prod`
 - Set `DEBUG=False`
 - Configure strict `ALLOWED_HOSTS`
+- Configure `CSRF_TRUSTED_ORIGINS`
 - Use strong `SECRET_KEY`
 - Apply secure PostgreSQL credentials from environment
-- Run `python manage.py collectstatic`
+- Run `python manage.py collectstatic --noinput`
+- Run a Celery worker with Redis
 - Configure media storage and backup policy
 - Keep HTTPS enabled for secure cookies/HSTS behavior
 

@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 
 from .models import Photo
-from .services import ensure_photo_derivatives_by_id
+from .tasks import schedule_photo_derivatives
 
 
 @admin.register(Photo)
@@ -72,13 +72,27 @@ class PhotoAdmin(admin.ModelAdmin):
 
     @admin.action(description="Generate missing derivatives")
     def generate_missing_derivatives(self, request, queryset):
-        updated = 0
+        scheduled = 0
+        processed = 0
+        skipped = 0
+        failed = 0
+
         for photo_id in queryset.values_list("id", flat=True):
-            if ensure_photo_derivatives_by_id(photo_id):
-                updated += 1
+            result = schedule_photo_derivatives(photo_id)
+            if result == "scheduled":
+                scheduled += 1
+            elif result == "processed":
+                processed += 1
+            elif result == "skipped":
+                skipped += 1
+            elif result == "failed":
+                failed += 1
 
         self.message_user(
             request,
-            f"Updated derivatives for {updated} photo(s).",
-            level=messages.INFO,
+            (
+                "Derivative jobs: "
+                f"scheduled={scheduled}, processed={processed}, skipped={skipped}, failed={failed}."
+            ),
+            level=messages.WARNING if failed else messages.INFO,
         )

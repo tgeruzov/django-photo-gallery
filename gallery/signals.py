@@ -4,7 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from .models import Photo
-from .services import ensure_photo_derivatives_by_id
+from .tasks import schedule_photo_derivatives
 
 
 @receiver(post_save, sender=Photo)
@@ -24,4 +24,4 @@ def ensure_derivatives_on_save(sender, instance, raw=False, **kwargs):
     if not (needs_variants or should_delete_original):
         return
 
-    transaction.on_commit(lambda: ensure_photo_derivatives_by_id(instance.pk))
+    transaction.on_commit(lambda: schedule_photo_derivatives(instance.pk))

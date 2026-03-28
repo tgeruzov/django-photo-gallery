@@ -40,4 +40,3 @@ Thanks for your interest in contributing.
   - `fix: ...`
   - `refactor: ...`
   - `chore: ...`
-

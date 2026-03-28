@@ -28,4 +28,3 @@ They may remove, edit, or reject comments, commits, code, and issues that violat
 ## Reporting
 
 If you experience or witness unacceptable behavior, contact the maintainers directly.
-

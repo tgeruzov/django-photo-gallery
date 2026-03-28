@@ -6,7 +6,6 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 
 from .image_utils import (
-    ImageProcessingError,
     build_optimized_content,
     build_thumbnail_content,
     open_image_from_file,

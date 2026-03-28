@@ -1,6 +1,7 @@
 import shutil
 import tempfile
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -10,6 +11,7 @@ from PIL import Image
 
 from .models import Photo
 from .services import ensure_photo_derivatives_by_id, save_uploaded_photo
+from .tasks import schedule_photo_derivatives
 
 
 def build_test_image(filename="test.png", size=(64, 64), color=(255, 0, 0)):
@@ -84,6 +86,37 @@ class PhotoServicesTest(GalleryTestCase):
         self.assertTrue(updated)
         self.assertTrue(bool(photo.thumbnail))
 
+    @override_settings(ENABLE_BACKGROUND_TASKS=False)
+    def test_schedule_photo_derivatives_processes_inline_when_background_disabled(self):
+        photo = Photo.objects.create(image=build_test_image(filename="inline.png"))
+
+        result = schedule_photo_derivatives(photo.pk)
+        photo.refresh_from_db()
+
+        self.assertEqual(result, "processed")
+        self.assertTrue(bool(photo.optimized_image))
+        self.assertTrue(bool(photo.thumbnail))
+
+    @override_settings(ENABLE_BACKGROUND_TASKS=True)
+    def test_schedule_photo_derivatives_falls_back_inline_when_queueing_fails(self):
+        photo = Photo.objects.create(image=build_test_image(filename="fallback.png"))
+
+        with patch("gallery.tasks.ensure_photo_derivatives_task.delay", side_effect=RuntimeError):
+            result = schedule_photo_derivatives(photo.pk)
+
+        photo.refresh_from_db()
+        self.assertEqual(result, "processed")
+        self.assertTrue(bool(photo.optimized_image))
+        self.assertTrue(bool(photo.thumbnail))
+
+    @override_settings(ENABLE_BACKGROUND_TASKS=True)
+    def test_signal_schedules_background_processing_on_commit(self):
+        with patch("gallery.signals.schedule_photo_derivatives") as schedule_mock:
+            with self.captureOnCommitCallbacks(execute=True):
+                photo = Photo.objects.create(image=build_test_image(filename="queued.png"))
+
+        schedule_mock.assert_called_once_with(photo.pk)
+
 
 class GalleryViewsTest(GalleryTestCase):
     def setUp(self):
@@ -137,20 +170,26 @@ class GalleryViewsTest(GalleryTestCase):
 
     def test_staff_ajax_upload_rejects_empty_submission(self):
         self.client.login(username="admin", password="pass")
-        response = self.client.post(reverse("upload_photo"), {}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        response = self.client.post(
+            reverse("upload_photo"), {}, HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
         self.assertEqual(response.status_code, 400)
         payload = response.json()
         self.assertFalse(payload["success"])
 
     def test_index_ajax_out_of_range_returns_empty(self):
-        response = self.client.get(reverse("index") + "?page=999", HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        response = self.client.get(
+            reverse("index") + "?page=999", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["photos"], [])
         self.assertFalse(payload["has_next"])
 
     def test_all_photos_json_supports_pagination(self):
-        Photo.objects.bulk_create([Photo(image=f"photos/p{i}.jpg", title=f"p{i}") for i in range(25)])
+        Photo.objects.bulk_create(
+            [Photo(image=f"photos/p{i}.jpg", title=f"p{i}") for i in range(25)]
+        )
         response = self.client.get(reverse("all_photos_json") + "?page=1&page_size=10")
         self.assertEqual(response.status_code, 200)
         payload = response.json()

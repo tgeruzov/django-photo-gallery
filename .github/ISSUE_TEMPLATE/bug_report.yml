@@ -50,4 +50,3 @@ body:
       label: Logs / Traceback
       description: Paste relevant logs or traceback
       render: shell
-

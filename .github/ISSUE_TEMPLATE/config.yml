@@ -3,4 +3,3 @@ contact_links:
   - name: Security report
     url: https://github.com/tgeruzov/django-photo-gallery/security/advisories/new
     about: Please report security vulnerabilities privately.
-

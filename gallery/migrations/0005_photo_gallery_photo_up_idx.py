@@ -6,12 +6,12 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('gallery', '0004_make_image_required'),
+        ("gallery", "0004_make_image_required"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='photo',
-            index=models.Index(fields=['-uploaded_at'], name='gallery_photo_up_idx'),
+            model_name="photo",
+            index=models.Index(fields=["-uploaded_at"], name="gallery_photo_up_idx"),
         ),
     ]
