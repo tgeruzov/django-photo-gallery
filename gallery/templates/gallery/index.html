@@ -7,6 +7,20 @@
 </div>
 {% endif %}
 <div class="gallery" id="gallery" data-all-photos-url="{% url 'all_photos_json' %}">{% include "gallery/partials/photo_cards.html" with photos=photos_page %}</div>
+<div
+  class="gallery-feed-status"
+  id="gallery-feed-status"
+  aria-live="polite"
+  data-state="idle"
+  hidden
+></div>
+<div
+  class="gallery-sentinel"
+  id="gallery-sentinel"
+  aria-hidden="true"
+  data-current-page="{{ photos_page.number }}"
+  data-has-next="{% if photos_page.has_next %}true{% else %}false{% endif %}"
+></div>
 <div class="lightbox" id="lightbox">
   <button class="lightbox-prev" aria-label="Предыдущее фото">
     <span class="material-icons">chevron_left</span>

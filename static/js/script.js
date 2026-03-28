@@ -1,13 +1,17 @@
 document.addEventListener('DOMContentLoaded', function () {
   setupThemeSwitcher();
-  const gallery = document.getElementById('gallery');
-  if (gallery) {
-      const lazyLoader = initLazyLoad(gallery);
-      setupInfiniteScroll(gallery, lazyLoader);
-  }
+  initGallery();
   initLightbox();
   initUploadForm();
 });
+
+function initGallery() {
+  const gallery = document.getElementById('gallery');
+  if (!gallery) return;
+
+  const cardRevealer = initLazyLoad(gallery);
+  setupInfiniteScroll(gallery, cardRevealer);
+}
 
 function setupThemeSwitcher() {
   const themeBtn = document.querySelector('.theme-toggle');
@@ -38,22 +42,62 @@ function setupThemeSwitcher() {
 }
 
 function initLazyLoad(container) {
-  const cards = container.querySelectorAll('.card:not(.loaded)');
-  if (cards.length === 0) return null;
-  
-  const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-          if (entry.isIntersecting) {
-              setTimeout(() => {
-                  entry.target.classList.add('loaded');
-              }, 50);
-              observer.unobserve(entry.target);
-          }
+  const revealCard = (card) => {
+    if (!card || card.classList.contains('loaded')) return;
+
+    const image = card.querySelector('img');
+    const markLoaded = () => {
+      requestAnimationFrame(() => {
+        card.classList.add('loaded');
       });
-  }, { rootMargin: '0px 0px 100px 0px', threshold: 0.01 });
-  
-  cards.forEach(card => observer.observe(card));
-  return observer;
+    };
+
+    if (!image || image.complete) {
+      markLoaded();
+      return;
+    }
+
+    const onDone = () => {
+      image.removeEventListener('load', onDone);
+      image.removeEventListener('error', onDone);
+      markLoaded();
+    };
+
+    image.addEventListener('load', onDone, { once: true });
+    image.addEventListener('error', onDone, { once: true });
+  };
+
+  const observer = 'IntersectionObserver' in window
+    ? new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          revealCard(entry.target);
+          observer.unobserve(entry.target);
+        });
+      }, { rootMargin: '0px 0px 160px 0px', threshold: 0.01 })
+    : null;
+
+  const api = {
+    observe(card) {
+      if (!card || card.dataset.revealObserved === 'true') return;
+      card.dataset.revealObserved = 'true';
+
+      if (!observer) {
+        revealCard(card);
+        return;
+      }
+
+      observer.observe(card);
+    },
+    disconnect() {
+      if (observer) {
+        observer.disconnect();
+      }
+    },
+  };
+
+  container.querySelectorAll('.card:not(.loaded)').forEach(api.observe);
+  return api;
 }
 
 function initLightbox() {
@@ -192,54 +236,103 @@ function initLightbox() {
   });
 }
 
-function setupInfiniteScroll(gallery, observer) {
+function setupInfiniteScroll(gallery, cardRevealer) {
+  const sentinel = document.getElementById('gallery-sentinel');
+  const status = document.getElementById('gallery-feed-status');
+  if (!sentinel) return;
+
   let loading = false;
-  let page = 2;
-  let hasMore = true;
+  let nextPage = parsePositiveInt(sentinel.dataset.currentPage, 1) + 1;
+  let hasMore = sentinel.dataset.hasNext === 'true';
+  let retryBlockedUntil = 0;
+
+  const maybeLoadMore = () => {
+    if (!hasMore || loading) return;
+    const rect = sentinel.getBoundingClientRect();
+    if (rect.top <= window.innerHeight + 500) {
+      loadMore();
+    }
+  };
+
+  const setFeedStatus = (state, message = '') => {
+    if (!status) return;
+    status.dataset.state = state;
+    status.textContent = message;
+    status.hidden = state === 'idle' || message === '';
+  };
 
   async function loadMore() {
     if (loading || !hasMore) return;
+    if (Date.now() < retryBlockedUntil) return;
+
     loading = true;
-    
+    setFeedStatus('loading', 'Загружаем еще фото...');
+
     try {
-        const response = await fetch(`?page=${page}`, {
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
+      const response = await fetch(buildUrlWithQuery(window.location.href, { page: nextPage }), {
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+
+      const photos = Array.isArray(data.photos) ? data.photos : [];
+      if (photos.length) {
+        const fragment = document.createDocumentFragment();
+        const newCards = [];
+
+        photos.forEach(photo => {
+          const card = createGalleryCard(photo);
+          if (!card) return;
+          newCards.push(card);
+          fragment.appendChild(card);
         });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+
+        if (newCards.length) {
+          gallery.appendChild(fragment);
+          newCards.forEach(card => cardRevealer.observe(card));
         }
-        const data = await response.json();
-        
-        if (Array.isArray(data.photos) && data.photos.length) {
-            data.photos.forEach(photo => {
-                const card = createGalleryCard(photo);
-                if (!card) return;
-                gallery.appendChild(card);
-                if (observer) observer.observe(card);
-            });
-        }
-        hasMore = Boolean(data.has_next);
-        if (hasMore) {
-            const apiPage = Number(data.page);
-            page = Number.isFinite(apiPage) && apiPage > 0 ? apiPage + 1 : page + 1;
-        }
+      }
+
+      const apiPage = parsePositiveInt(data.page, nextPage);
+      hasMore = Boolean(data.has_next);
+      nextPage = apiPage + 1;
+      sentinel.dataset.currentPage = String(apiPage);
+      sentinel.dataset.hasNext = String(hasMore);
+      setFeedStatus('idle');
+
+      if (hasMore) {
+        requestAnimationFrame(maybeLoadMore);
+      }
     } catch (err) {
-        console.error('Ошибка загрузки:', err);
+      retryBlockedUntil = Date.now() + 2000;
+      setFeedStatus('error', 'Не удалось загрузить еще фото. Прокрутите страницу еще раз.');
+      console.error('Ошибка загрузки:', err);
     } finally {
-        loading = false;
+      loading = false;
     }
   }
 
-  window.addEventListener('scroll', () => {
-    const scrollPos = window.innerHeight + window.pageYOffset;
-    const threshold = document.body.offsetHeight * 0.8;
-    if (scrollPos >= threshold) {
-        loadMore();
-    }
-  });
+  if ('IntersectionObserver' in window) {
+    const sentinelObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          loadMore();
+        }
+      });
+    }, { rootMargin: '0px 0px 500px 0px' });
+
+    sentinelObserver.observe(sentinel);
+  } else {
+    window.addEventListener('scroll', maybeLoadMore, { passive: true });
+  }
+
+  window.addEventListener('resize', maybeLoadMore, { passive: true });
+  maybeLoadMore();
 }
 
 function initUploadForm() {
@@ -449,12 +542,25 @@ function createGalleryCard(photo) {
 
   const img = document.createElement('img');
   img.loading = 'lazy';
+  img.decoding = 'async';
   img.src = photo.url;
   img.alt = photo.title || '';
   img.dataset.full = photo.full_url;
 
+  const width = parsePositiveInt(photo.width, 0);
+  const height = parsePositiveInt(photo.height, 0);
+  if (width > 0 && height > 0) {
+    img.width = width;
+    img.height = height;
+  }
+
   card.appendChild(img);
   return card;
+}
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function buildUrlWithQuery(basePath, params) {

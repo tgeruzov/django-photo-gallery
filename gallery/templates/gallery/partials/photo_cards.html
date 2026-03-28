@@ -2,19 +2,51 @@
 {% with photo_label=photo.alt_text|default:photo.title|default:'Uploaded Image' %}
   {% if photo.thumbnail and photo.optimized_image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
-    <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo_label }}" data-full="{{ photo.optimized_image.url }}" />
+    <img
+      loading="lazy"
+      decoding="async"
+      src="{{ photo.thumbnail.url }}"
+      alt="{{ photo_label }}"
+      data-full="{{ photo.optimized_image.url }}"
+      width="{{ photo.thumbnail.width }}"
+      height="{{ photo.thumbnail.height }}"
+    />
   </button>
   {% elif photo.thumbnail and photo.image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
-    <img loading="lazy" src="{{ photo.thumbnail.url }}" alt="{{ photo_label }}" data-full="{{ photo.image.url }}" />
+    <img
+      loading="lazy"
+      decoding="async"
+      src="{{ photo.thumbnail.url }}"
+      alt="{{ photo_label }}"
+      data-full="{{ photo.image.url }}"
+      width="{{ photo.thumbnail.width }}"
+      height="{{ photo.thumbnail.height }}"
+    />
   </button>
   {% elif photo.optimized_image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
-    <img loading="lazy" src="{{ photo.optimized_image.url }}" alt="{{ photo_label }}" data-full="{{ photo.optimized_image.url }}" />
+    <img
+      loading="lazy"
+      decoding="async"
+      src="{{ photo.optimized_image.url }}"
+      alt="{{ photo_label }}"
+      data-full="{{ photo.optimized_image.url }}"
+      width="{{ photo.optimized_image.width }}"
+      height="{{ photo.optimized_image.height }}"
+    />
   </button>
   {% elif photo.image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
-    <img loading="lazy" src="{{ photo.image.url }}" alt="{{ photo_label }}" data-full="{{ photo.image.url }}" />
+    <img
+      loading="lazy"
+      decoding="async"
+      src="{{ photo.image.url }}"
+      alt="{{ photo_label }}"
+      data-full="{{ photo.image.url }}"
+      width="{{ photo.image.width }}"
+      height="{{ photo.image.height }}"
+    />
   </button>
   {% else %}
   <div class="card card-empty">

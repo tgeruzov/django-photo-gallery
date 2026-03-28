@@ -1,24 +1,19 @@
+import logging
+
 from django.contrib import messages
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
-from django.http import JsonResponse
-from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.http import require_GET
-import logging
-import os
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.core.files.base import ContentFile
-from django.db import transaction
+
 from .forms import PhotoUploadForm
 from .models import Photo
 from .constants import AJAX_HEADER, AJAX_VALUE
-from .image_utils import (
-    ImageProcessingError,
-    build_optimized_content,
-    build_thumbnail_content,
-    open_image_from_file,
-)
+from .image_utils import ImageProcessingError
+from .services import save_uploaded_photo
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +38,23 @@ def serialize_photo(photo):
     except ValueError:
         preview_url = full_url
 
+    width = None
+    height = None
+    if display_image:
+        try:
+            width = display_image.width
+            height = display_image.height
+        except (ValueError, FileNotFoundError, OSError):
+            width = None
+            height = None
+
     return {
         'id': photo.id,
         'url': preview_url,
         'full_url': full_url,
         'title': str(photo),
+        'width': width,
+        'height': height,
     }
 
 def index(request):
@@ -78,26 +85,6 @@ def index(request):
 
     return render(request, 'gallery/index.html', {'photos_page': photos_page})
 
-def save_optimized_and_thumbnail(uploaded_file):
-    """Сохраняет оригинал, оптимизированную копию и миниатюру атомарно."""
-    uploaded_file.seek(0)
-    img = open_image_from_file(uploaded_file)
-    optimized_content = build_optimized_content(img, uploaded_file.name)
-    thumbnail_content = build_thumbnail_content(img, uploaded_file.name)
-
-    uploaded_file.seek(0)
-    original_name = os.path.basename(uploaded_file.name)
-    original_content = ContentFile(uploaded_file.read(), name=original_name)
-
-    with transaction.atomic():
-        photo = Photo()
-        photo.image.save(original_name, original_content, save=False)
-        photo.optimized_image.save(optimized_content.name, optimized_content, save=False)
-        photo.thumbnail.save(thumbnail_content.name, thumbnail_content, save=False)
-        photo.save()
-
-    return photo
-
 @staff_member_required
 def upload_photo(request):
     form = PhotoUploadForm(request.POST or None, request.FILES or None)
@@ -120,7 +107,7 @@ def upload_photo(request):
 
         for file in files:
             try:
-                save_optimized_and_thumbnail(file)
+                save_uploaded_photo(file)
                 uploaded_count += 1
             except ImageProcessingError as exc:
                 logger.warning("Ошибка обработки %s: %s", file.name, exc)

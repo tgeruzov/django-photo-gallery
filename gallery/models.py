@@ -29,6 +29,10 @@ class Photo(models.Model):
     )
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата загрузки")
 
+    @property
+    def has_complete_variants(self):
+        return bool(self.optimized_image and self.thumbnail)
+
     def __str__(self):
         if self.title:
             return self.title
@@ -40,3 +44,6 @@ class Photo(models.Model):
         verbose_name = "Фотография"
         verbose_name_plural = "Фотографии"
         ordering = ['-uploaded_at']
+        indexes = [
+            models.Index(fields=['-uploaded_at'], name='gallery_photo_up_idx'),
+        ]
