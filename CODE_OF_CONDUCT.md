@@ -1,30 +1,54 @@
 # Code of Conduct
 
-## Our Commitment
+This project should feel calm, respectful, and safe to contribute to.
 
-We are committed to a welcoming and harassment-free environment for everyone,
-regardless of age, body size, disability, ethnicity, gender identity and expression,
-experience level, nationality, personal appearance, race, religion, or sexual identity.
+## Our Standard
+
+We want a community where people can:
+
+- ask questions without being talked down to
+- disagree without becoming hostile
+- give feedback without making it personal
+- contribute at different experience levels without embarrassment
 
 ## Expected Behavior
 
 - Be respectful and constructive.
-- Assume good intent and discuss ideas, not people.
-- Give and receive feedback professionally.
-- Focus on what is best for the project and community.
+- Assume good intent before assuming bad faith.
+- Critique code, decisions, or ideas, not people.
+- Be clear, patient, and professional in issues, reviews, and discussions.
+- Help keep the project welcoming to new contributors.
 
 ## Unacceptable Behavior
 
-- Harassment, insults, or discriminatory language.
-- Personal attacks or trolling.
-- Publishing private information without permission.
-- Any conduct that is inappropriate in a professional setting.
+The following behavior is not acceptable:
 
-## Enforcement
+- harassment or intimidation
+- insults, slurs, or discriminatory language
+- personal attacks or repeated bad-faith arguing
+- publishing private information without permission
+- trolling, baiting, or intentionally disruptive behavior
 
-Project maintainers are responsible for clarifying and enforcing these standards.
-They may remove, edit, or reject comments, commits, code, and issues that violate this policy.
+## Scope
+
+This Code of Conduct applies to:
+
+- issues
+- pull requests
+- discussions
+- review comments
+- other project spaces managed through the repository
+
+## Maintainer Responsibility
+
+Maintainers may edit, hide, lock, or remove content that violates this policy.
+
+They may also reject contributions or limit participation when someone repeatedly acts against the health of the project.
 
 ## Reporting
 
-If you experience or witness unacceptable behavior, contact the maintainers directly.
+If you experience or witness unacceptable behavior, contact the maintainer through GitHub.
+
+If the report involves sensitive details, keep it private and avoid posting the details in a public issue or discussion.
+
+Reports will be reviewed as promptly and fairly as possible.

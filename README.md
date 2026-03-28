@@ -1,7 +1,9 @@
 <h1 align="center">Django Photo Gallery</h1>
 
 <p align="center">
-  A modern Django + PostgreSQL photo gallery with infinite scroll, optimized images, and fullscreen lightbox experience.
+  A personal photo gallery that feels like a viewing space first and an admin panel second.
+  <br />
+  Fast browsing, fullscreen viewing, optimized image delivery, and a Django backend that is ready to grow up.
 </p>
 
 <p align="center">
@@ -23,50 +25,91 @@
 </p>
 
 <p align="center">
-  <a href="#at-a-glance">At a Glance</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#api-and-routes">API & Routes</a> •
-  <a href="#project-layout">Project Layout</a> •
+  <a href="#through-the-lens">Through the Lens</a>
+  ·
+  <a href="#darkroom-pipeline">Darkroom Pipeline</a>
+  ·
+  <a href="#choose-your-setup">Choose Your Setup</a>
+  ·
+  <a href="#field-notes">Field Notes</a>
+  ·
   <a href="#community">Community</a>
 </p>
 
----
+<p align="center">
+  <img src="docs/readme-preview.jpg" alt="Gallery preview" width="88%">
+</p>
 
-## At a Glance
+## Through the Lens
 
-| Capability | Details |
-| --- | --- |
-| Gallery UX | Masonry-style grid with lazy reveal and infinite scroll |
-| Viewing | Fullscreen lightbox with keyboard and mobile swipe navigation |
-| Upload | Multi-file upload for staff users with drag-and-drop |
-| Image pipeline | Original + optimized + thumbnail generated on upload |
-| Background jobs | Celery-ready derivative backfill with eager local fallback |
-| API | Paginated JSON endpoint for full gallery data |
-| Deployment | Docker Compose and local setup workflows |
-| CI | GitHub Actions: pre-commit + migrate + Django tests |
+This project is built around the act of looking at photos.
 
-## Stack
+- Visitors get a dense, scrollable gallery with fullscreen viewing and mobile-friendly navigation.
+- Staff users get a focused upload flow instead of a cluttered content system.
+- The backend generates optimized versions and thumbnails so the gallery feels fast without manual asset prep.
+- The repo itself is set up for long-term maintenance: split settings, Docker workflows, CI, linting, and Celery-ready background processing.
 
-| Layer | Technology |
-| --- | --- |
-| Backend | Django 3.2 |
-| Database | PostgreSQL (Docker uses `postgres:16-alpine`) |
-| Frontend | Vanilla JS + HTML + CSS |
-| Image processing | Pillow |
-| Static serving | WhiteNoise (enabled when `DEBUG=False`) |
-| App server | Gunicorn |
-| Background tasks | Celery + Redis (production profile) |
+<table>
+  <tr>
+    <td width="33%">
+      <strong>For viewers</strong>
+      <br />
+      Infinite scroll, stable image grid, fullscreen lightbox, keyboard navigation, mobile swipe support.
+    </td>
+    <td width="33%">
+      <strong>For maintainers</strong>
+      <br />
+      Split Django settings, production-like Docker profile, Celery worker path, shared media/static volumes.
+    </td>
+    <td width="33%">
+      <strong>For contributors</strong>
+      <br />
+      Pre-commit, Ruff, Black, GitHub Actions, tests for upload flow, image derivatives, and API behavior.
+    </td>
+  </tr>
+</table>
 
-## Quick Start
+## Darkroom Pipeline
 
-### 1) Clone repository
-
-```bash
-git clone https://github.com/tgeruzov/django-photo-gallery.git
-cd django-photo-gallery
+```mermaid
+flowchart LR
+    A["Staff upload"] --> B["Validation"]
+    B --> C["Photo record"]
+    C --> D["Original media"]
+    C --> E["Derivative generation"]
+    E --> F["Optimized image"]
+    E --> G["Thumbnail"]
+    G --> H["Gallery grid"]
+    F --> I["Lightbox view"]
+    G --> J["JSON API"]
+    E --> K["Celery task or eager local fallback"]
 ```
 
-### 2) Create environment file
+The same photo moves through a small but deliberate pipeline:
+
+1. A staff user uploads one or more files.
+2. The app validates format and size, then stores the source image.
+3. Optimized and thumbnail variants are generated.
+4. The gallery grid uses lighter assets, while fullscreen viewing uses the larger optimized version.
+5. In development this can run eagerly, and in production-like mode it can be handed off to Celery.
+
+## What Makes It Feel Different
+
+### Browsing is the product
+
+This is not a generic CMS with images attached. The viewing experience is the main feature, so the grid, lazy loading, lightbox, and progressive loading behavior matter as much as the admin flow.
+
+### The image pipeline is part of the app
+
+Instead of expecting someone to manually prepare assets, the project creates the versions it needs and can backfill missing derivatives later.
+
+### The repo is ready for the next step
+
+The project still feels like a personal gallery, but it now has the structure needed for safer iteration: separate settings, quality gates, a documented production path, and background-task support.
+
+## Choose Your Setup
+
+### Fastest start: Docker
 
 ```bash
 # Linux / macOS
@@ -74,18 +117,13 @@ cp .env.example .env
 
 # Windows PowerShell
 Copy-Item .env.example .env
-```
 
-### 3) Run with Docker (recommended)
-
-```bash
 docker compose up --build
 ```
 
 Open [http://localhost:8000](http://localhost:8000)
 
-<details>
-<summary><strong>Run locally (without Docker)</strong></summary>
+### Local Python setup
 
 ```bash
 python -m venv .venv
@@ -105,72 +143,34 @@ python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
-</details>
 
-### 4) Install developer tooling
-
-```bash
-pip install -r requirements-dev.txt
-pre-commit install
-```
-
-### 5) Production-like profile
+### Production-like rehearsal
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build
 ```
 
-This profile runs:
+That profile runs:
 
-- Django with `DJANGO_ENV=prod`
-- Gunicorn for the web app
-- Celery worker for background jobs
-- Redis as the broker/backend
+- Django in `prod` mode
+- Gunicorn as the app server
+- Redis for Celery broker/result backend
+- A dedicated Celery worker
 - PostgreSQL for persistence
-- Shared named volumes for `media/` and collected static files
+- Shared named volumes for `media/` and `staticfiles/`
 
-For localhost smoke-testing this profile keeps `SECURE_SSL_REDIRECT=0` so the app remains reachable over plain HTTP. In a real deployment behind HTTPS, turn it back on.
+For localhost smoke tests this profile keeps `SECURE_SSL_REDIRECT=0`, so it stays reachable over plain HTTP. Behind a real HTTPS proxy, turn that back on.
 
-## Environment Variables
+## Control Panel
 
-Use `.env.example` as a base:
-
-| Variable | Purpose |
+| Route | Purpose |
 | --- | --- |
-| `DJANGO_ENV` | Selects `dev` or `prod` settings |
-| `DEBUG` | Enables debug mode |
-| `SECRET_KEY` | Django secret key |
-| `ALLOWED_HOSTS` | Comma-separated hostnames |
-| `CSRF_TRUSTED_ORIGINS` | Trusted origins for secure deployments |
-| `TIME_ZONE` | Application and Celery timezone |
-| `DB_NAME` | PostgreSQL database name |
-| `DB_USER` | PostgreSQL user |
-| `DB_PASSWORD` | PostgreSQL password |
-| `DB_HOST` | PostgreSQL host |
-| `DB_PORT` | PostgreSQL port |
-| `DB_CONN_MAX_AGE` | Persistent DB connection lifetime in seconds |
-| `MAX_UPLOAD_SIZE_MB` | Max upload size per file |
-| `MAX_IMAGE_PIXELS` | Pixel safety guard for image parsing |
-| `MAX_JSON_PAGE_SIZE` | Max `page_size` for JSON endpoint |
-| `DELETE_ORIGINAL_AFTER_OPTIMIZE` | Deletes original after optimization if enabled |
-| `ENABLE_BACKGROUND_TASKS` | Enables asynchronous derivative generation |
-| `CELERY_TASK_ALWAYS_EAGER` | Executes Celery tasks inline when enabled |
-| `CELERY_BROKER_URL` | Celery broker connection string |
-| `CELERY_RESULT_BACKEND` | Celery result backend |
-| `SECURE_SSL_REDIRECT` | Forces HTTPS redirects in production mode |
-| `SECURE_HSTS_SECONDS` | HSTS max-age for secure deployments |
-| `LOG_LEVEL` | Base log verbosity |
+| `/` | Main gallery page with AJAX pagination |
+| `/upload/` | Staff-only multi-file upload page |
+| `/all_photos.json` | Paginated gallery API |
+| `/admin/` | Django admin |
 
-## API and Routes
-
-| Route | Method | Description |
-| --- | --- | --- |
-| `/` | GET | Main gallery page (supports AJAX pagination via `?page=`) |
-| `/upload/` | GET, POST | Staff-only multi-file upload page |
-| `/all_photos.json` | GET | Paginated JSON API (`page`, `page_size`) |
-| `/admin/` | GET | Django admin |
-
-### Example: JSON response
+### Example API response
 
 ```json
 {
@@ -189,12 +189,43 @@ Use `.env.example` as a base:
 }
 ```
 
-## Project Layout
+## Field Notes
+
+<details open>
+<summary><strong>Key environment variables</strong></summary>
+
+- Core app: `DJANGO_ENV`, `DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `TIME_ZONE`
+- Database: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_CONN_MAX_AGE`
+- Image pipeline: `MAX_UPLOAD_SIZE_MB`, `MAX_IMAGE_PIXELS`, `MAX_JSON_PAGE_SIZE`, `DELETE_ORIGINAL_AFTER_OPTIMIZE`
+- Background work: `ENABLE_BACKGROUND_TASKS`, `CELERY_TASK_ALWAYS_EAGER`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`
+- Production security: `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`
+- Logging: `LOG_LEVEL`
+
+</details>
+
+<details>
+<summary><strong>Quality gates</strong></summary>
+
+```bash
+pip install -r requirements-dev.txt
+pre-commit install
+pre-commit run --all-files
+python manage.py check
+python manage.py test
+```
+
+GitHub Actions also runs linting, migrations, and tests on `push` and `pull_request`.
+
+</details>
+
+<details>
+<summary><strong>Repository map</strong></summary>
 
 ```text
 django-photo-gallery/
 ├── config/                  # Django config, split settings, Celery wiring
-├── gallery/                 # Gallery app (models, views, forms, utils)
+├── docs/                    # README assets
+├── gallery/                 # Models, views, services, forms, tests
 ├── static/                  # CSS, JS, icons
 ├── .github/workflows/       # CI pipeline
 ├── docker-compose.yml
@@ -206,18 +237,19 @@ django-photo-gallery/
 └── manage.py
 ```
 
+</details>
+
 ## Production Checklist
 
 - Set `DJANGO_ENV=prod`
-- Set `DEBUG=False`
+- Set `DEBUG=0`
+- Use a strong random `SECRET_KEY`
 - Configure strict `ALLOWED_HOSTS`
 - Configure `CSRF_TRUSTED_ORIGINS`
-- Use strong `SECRET_KEY`
-- Apply secure PostgreSQL credentials from environment
 - Run `python manage.py collectstatic --noinput`
-- Run a Celery worker with Redis
-- Configure media storage and backup policy
-- Keep HTTPS enabled for secure cookies/HSTS behavior
+- Run Redis and a Celery worker
+- Keep `media/` backed up
+- Enable HTTPS redirects in real production
 
 ## Community
 
