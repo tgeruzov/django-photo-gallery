@@ -1,37 +1,32 @@
 import logging
 
-from celery import shared_task
-from django.conf import settings
-
+from .image_utils import ImageProcessingError
 from .services import ensure_photo_derivatives_by_id
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_jitter=True,
-    retry_kwargs={"max_retries": 3},
-)
-def ensure_photo_derivatives_task(self, photo_id):
-    return ensure_photo_derivatives_by_id(photo_id)
+def ensure_photo_derivatives_task(photo_id):
+    """
+    Compatibility wrapper retained for older imports.
+
+    Shared hosting on Timeweb runs the derivative generation inline inside the
+    current request, admin action, or cron job instead of relying on a worker queue.
+    """
+    try:
+        return ensure_photo_derivatives_by_id(photo_id)
+    except ImageProcessingError as exc:
+        logger.warning("Permanent image processing error for photo %s: %s", photo_id, exc)
+        return False
 
 
 def schedule_photo_derivatives(photo_id):
-    if getattr(settings, "ENABLE_BACKGROUND_TASKS", False):
-        try:
-            ensure_photo_derivatives_task.delay(photo_id)
-            return "scheduled"
-        except Exception:
-            logger.exception(
-                "Failed to queue derivative generation for photo %s. Falling back to inline processing.",
-                photo_id,
-            )
-
+    """Process derivative files inline for a single photo."""
     try:
         updated = ensure_photo_derivatives_by_id(photo_id)
+    except ImageProcessingError as exc:
+        logger.warning("Inline derivative generation failed for photo %s: %s", photo_id, exc)
+        return "failed"
     except Exception:
         logger.exception("Inline derivative generation failed for photo %s.", photo_id)
         return "failed"

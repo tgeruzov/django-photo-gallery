@@ -22,6 +22,7 @@ if MAX_IMAGE_PIXELS:
     Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 ORIENTATION_TAG = next((tag for tag, name in ExifTags.TAGS.items() if name == "Orientation"), None)
+RESAMPLING_LANCZOS = Image.Resampling.LANCZOS if hasattr(Image, "Resampling") else Image.LANCZOS
 
 
 class ImageProcessingError(Exception):
@@ -82,7 +83,7 @@ def open_image_from_path(image_path):
 
 def make_image_variant_buffer(img, size, quality, fmt):
     img_copy = img.copy()
-    img_copy.thumbnail(size, Image.Resampling.LANCZOS)
+    img_copy.thumbnail(size, RESAMPLING_LANCZOS)
     buffer = BytesIO()
     save_kwargs = {"format": fmt, "quality": quality}
     if fmt.upper() == "WEBP":
