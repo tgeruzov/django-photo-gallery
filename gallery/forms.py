@@ -21,7 +21,8 @@ class MultipleFileField(forms.FileField):
             if self.required:
                 raise ValidationError(self.error_messages["required"], code="required")
             return []
-        if isinstance(data, (list, tuple)):
+        # Keep tuple syntax for shared-hosting Python 3.6 compatibility.
+        if isinstance(data, (list, tuple)):  # noqa: UP038
             result = [single_file_clean(d, initial) for d in data]
             return result
         return [single_file_clean(data, initial)]

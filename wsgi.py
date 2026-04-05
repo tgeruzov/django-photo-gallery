@@ -2,8 +2,9 @@ import os
 import sys
 from pathlib import Path
 
-
-PROJECT_ROOT = Path(os.environ.get("TIMEWEB_PROJECT_ROOT", Path(__file__).resolve().parent)).expanduser()
+PROJECT_ROOT = Path(
+    os.environ.get("TIMEWEB_PROJECT_ROOT", Path(__file__).resolve().parent)
+).expanduser()
 
 
 def activate_virtualenv():
@@ -42,6 +43,6 @@ if os.environ.get("DB_ENGINE", "mysql").strip().lower() in {"sqlite", "sqlite3"}
 os.environ.setdefault("DJANGO_ENV", "shared")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings_shared")
 
-from django.core.wsgi import get_wsgi_application
+from django.core.wsgi import get_wsgi_application  # noqa: E402
 
 application = get_wsgi_application()

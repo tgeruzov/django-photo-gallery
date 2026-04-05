@@ -22,9 +22,7 @@ if MAX_IMAGE_PIXELS:
     Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 ORIENTATION_TAG = next((tag for tag, name in ExifTags.TAGS.items() if name == "Orientation"), None)
-RESAMPLING_LANCZOS = (
-    Image.Resampling.LANCZOS if hasattr(Image, "Resampling") else Image.LANCZOS
-)
+RESAMPLING_LANCZOS = Image.Resampling.LANCZOS if hasattr(Image, "Resampling") else Image.LANCZOS
 
 
 class ImageProcessingError(Exception):
