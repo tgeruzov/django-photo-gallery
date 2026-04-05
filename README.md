@@ -13,6 +13,10 @@
 </p>
 
 <p align="center">
+  <a href="https://tgeruzov.ru/"><strong>Live example</strong></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
     <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
   </a>
