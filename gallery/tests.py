@@ -1,14 +1,12 @@
 import shutil
 import tempfile
-from io import BytesIO
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db.utils import OperationalError
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
