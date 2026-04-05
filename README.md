@@ -37,7 +37,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/image.png" alt="Gallery preview" width="88%">
+  <img src="docs/image.png" alt="Gallery preview" width="48%">
+  <img src="docs/upload-preview.png" alt="Upload flow preview" width="48%">
 </p>
 
 ## Through the Lens
