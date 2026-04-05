@@ -1,6 +1,7 @@
 import shutil
 import tempfile
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -55,6 +56,25 @@ class PhotoServicesTest(GalleryTestCase):
         self.assertTrue(bool(photo.image))
         self.assertTrue(bool(photo.optimized_image))
         self.assertTrue(bool(photo.thumbnail))
+
+    def test_save_uploaded_photo_cleans_up_files_when_database_save_fails(self):
+        before_files = {
+            path.relative_to(self._temp_media_root)
+            for path in Path(self._temp_media_root).rglob("*")
+            if path.is_file()
+        }
+
+        with patch.object(Photo, "save", side_effect=RuntimeError("db unavailable")):
+            with self.assertRaises(RuntimeError):
+                save_uploaded_photo(build_test_image(filename="rollback.png"))
+
+        after_files = {
+            path.relative_to(self._temp_media_root)
+            for path in Path(self._temp_media_root).rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(after_files, before_files)
+        self.assertEqual(Photo.objects.count(), 0)
 
     @override_settings(DELETE_ORIGINAL_AFTER_OPTIMIZE=True)
     def test_save_uploaded_photo_can_delete_original_after_optimization(self):

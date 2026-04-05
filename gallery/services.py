@@ -16,6 +16,18 @@ from .models import Photo
 logger = logging.getLogger(__name__)
 
 
+def cleanup_saved_photo_files(photo):
+    """Best-effort cleanup for files written before the DB transaction failed."""
+    for field_name in ("image", "optimized_image", "thumbnail"):
+        file_field = getattr(photo, field_name, None)
+        if not file_field:
+            continue
+        try:
+            file_field.delete(save=False)
+        except OSError:
+            logger.warning("Failed to clean up %s for photo rollback.", field_name)
+
+
 def save_uploaded_photo(uploaded_file):
     """Persist the original upload and eagerly generate its derived files."""
     uploaded_file.seek(0)
@@ -27,17 +39,21 @@ def save_uploaded_photo(uploaded_file):
     original_name = os.path.basename(uploaded_file.name)
     original_content = ContentFile(uploaded_file.read(), name=original_name)
 
-    with transaction.atomic():
-        photo = Photo()
-        photo.image.save(original_name, original_content, save=False)
-        photo.optimized_image.save(optimized_content.name, optimized_content, save=False)
-        photo.thumbnail.save(thumbnail_content.name, thumbnail_content, save=False)
-        photo.save()
+    photo = Photo()
+    try:
+        with transaction.atomic():
+            photo.image.save(original_name, original_content, save=False)
+            photo.optimized_image.save(optimized_content.name, optimized_content, save=False)
+            photo.thumbnail.save(thumbnail_content.name, thumbnail_content, save=False)
+            photo.save()
 
-        if getattr(settings, "DELETE_ORIGINAL_AFTER_OPTIMIZE", False):
-            photo.image.delete(save=False)
-            photo.image = ""
-            photo.save(update_fields=["image"])
+            if getattr(settings, "DELETE_ORIGINAL_AFTER_OPTIMIZE", False):
+                photo.image.delete(save=False)
+                photo.image = ""
+                photo.save(update_fields=["image"])
+    except Exception:
+        cleanup_saved_photo_files(photo)
+        raise
 
     return photo
 
