@@ -7,6 +7,12 @@
 </p>
 
 <p align="center">
+  <a href="README.md"><strong>English</strong></a>
+  ·
+  <a href="README.ru.md">Русский</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
     <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
   </a>
