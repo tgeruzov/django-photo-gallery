@@ -17,6 +17,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/tgeruzov/django-photo-gallery/blob/deploy/timeweb-shared/docs/timeweb-deploy.md"><strong>Гайд по деплою на Timeweb shared hosting</strong></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
     <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
   </a>
