@@ -1,10 +1,11 @@
 {% load static %} {% for photo in photos %}
-{% with photo_label=photo.alt_text|default:photo.title|default:'Uploaded Image' %}
+{% with photo_label=photo.display_label %}
   {% if photo.thumbnail and photo.optimized_image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
     <img
-      loading="lazy"
+      loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"
+      fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
       src="{{ photo.thumbnail.url }}"
       alt="{{ photo_label }}"
       data-full="{{ photo.optimized_image.url }}"
@@ -15,8 +16,9 @@
   {% elif photo.thumbnail and photo.image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
     <img
-      loading="lazy"
+      loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"
+      fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
       src="{{ photo.thumbnail.url }}"
       alt="{{ photo_label }}"
       data-full="{{ photo.image.url }}"
@@ -27,8 +29,9 @@
   {% elif photo.optimized_image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
     <img
-      loading="lazy"
+      loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"
+      fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
       src="{{ photo.optimized_image.url }}"
       alt="{{ photo_label }}"
       data-full="{{ photo.optimized_image.url }}"
@@ -39,8 +42,9 @@
   {% elif photo.image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
     <img
-      loading="lazy"
+      loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"
+      fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
       src="{{ photo.image.url }}"
       alt="{{ photo_label }}"
       data-full="{{ photo.image.url }}"

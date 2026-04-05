@@ -534,17 +534,18 @@ function showSwipeHint() {
 
 function createGalleryCard(photo) {
   if (!photo || !photo.url || !photo.full_url) return null;
+  const photoLabel = photo.alt_text || photo.title || 'Фотография';
 
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'card';
-  card.setAttribute('aria-label', `Открыть фото: ${photo.title || 'Без названия'}`);
+  card.setAttribute('aria-label', `Открыть фото: ${photoLabel}`);
 
   const img = document.createElement('img');
   img.loading = 'lazy';
   img.decoding = 'async';
   img.src = photo.url;
-  img.alt = photo.title || '';
+  img.alt = photoLabel;
   img.dataset.full = photo.full_url;
 
   const width = parsePositiveInt(photo.width, 0);

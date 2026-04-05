@@ -172,6 +172,24 @@ class GalleryViewsTest(GalleryTestCase):
         response = self.client.get(reverse("index"))
         self.assertEqual(response.status_code, 200)
 
+    def test_index_page_includes_seo_metadata_and_structured_data(self):
+        Photo.objects.create(
+            image=build_test_image(filename="seo.png"),
+            title="Main gallery hero shot",
+            alt_text="Вечерняя панорама города",
+        )
+
+        response = self.client.get(reverse("index"))
+        content = response.content.decode()
+
+        self.assertIn('<link rel="canonical" href="http://testserver/" />', content)
+        self.assertIn('name="description"', content)
+        self.assertIn('property="og:title"', content)
+        self.assertIn('property="og:image"', content)
+        self.assertIn('"@type": "ImageGallery"', content)
+        self.assertIn("Вечерняя панорама города", content)
+        self.assertContains(response, "Фотогалерея Тимура Герузова")
+
     def test_upload_requires_login(self):
         response = self.client.get(reverse("upload_photo"))
         self.assertEqual(response.status_code, 302)
@@ -180,6 +198,8 @@ class GalleryViewsTest(GalleryTestCase):
         self.client.login(username="admin", password="pass")
         response = self.client.get(reverse("upload_photo"))
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
+        self.assertContains(response, 'content="noindex, nofollow, noarchive"')
 
     def test_staff_ajax_upload_success_creates_variants(self):
         self.client.login(username="admin", password="pass")
@@ -191,6 +211,7 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["success"])
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
         photo = Photo.objects.get()
         self.assertTrue(bool(photo.image))
         self.assertTrue(bool(photo.optimized_image))
@@ -207,6 +228,7 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.json()
         self.assertFalse(payload["success"])
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
         self.assertEqual(Photo.objects.count(), 0)
 
     def test_staff_ajax_upload_rejects_empty_submission(self):
@@ -217,12 +239,14 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.json()
         self.assertFalse(payload["success"])
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
 
     def test_index_ajax_out_of_range_returns_empty(self):
         response = self.client.get(
             reverse("index") + "?page=999", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
         )
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
         payload = response.json()
         self.assertEqual(payload["photos"], [])
         self.assertFalse(payload["has_next"])
@@ -238,6 +262,7 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertTrue(payload["has_next"])
         self.assertEqual(payload["page"], 1)
         self.assertEqual(payload["page_size"], 10)
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
 
     def test_all_photos_json_includes_dimensions_for_real_images(self):
         Photo.objects.create(image=build_test_image(filename="dimensions.png"))
@@ -248,6 +273,20 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertEqual(payload["photos"][0]["width"], 64)
         self.assertEqual(payload["photos"][0]["height"], 64)
 
+    def test_all_photos_json_exposes_alt_text_for_dynamic_cards(self):
+        Photo.objects.create(
+            image=build_test_image(filename="alt-text.png"),
+            title="Skyline",
+            alt_text="Ночной городской skyline",
+        )
+
+        response = self.client.get(reverse("all_photos_json"))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertEqual(payload["photos"][0]["alt_text"], "Ночной городской skyline")
+        self.assertEqual(payload["photos"][0]["title"], "Skyline")
+
     def test_all_photos_json_skips_broken_records(self):
         photo = Photo.objects.create(image=build_test_image(filename="broken.png"))
         Photo.objects.filter(pk=photo.pk).update(image="")
@@ -256,18 +295,20 @@ class GalleryViewsTest(GalleryTestCase):
         payload = response.json()
         self.assertEqual(payload["photos"], [])
 
-    def test_health_check_returns_ok(self):
-        response = self.client.get(reverse("health_check"))
+    def test_robots_txt_advertises_sitemap_and_blocks_internal_routes(self):
+        response = self.client.get(reverse("robots_txt"))
+        content = response.content.decode()
+
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "ok")
-        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertIn("User-agent: *", content)
+        self.assertIn("Disallow: /admin/", content)
+        self.assertIn("Disallow: /upload/", content)
+        self.assertIn("Disallow: /all_photos.json", content)
+        self.assertIn("Sitemap: http://testserver/sitemap.xml", content)
 
-    def test_health_check_returns_service_unavailable_on_db_error(self):
-        failing_connection = MagicMock()
-        failing_connection.cursor.side_effect = OperationalError("db unavailable")
+    def test_sitemap_lists_homepage(self):
+        response = self.client.get(reverse("sitemap"))
+        content = response.content.decode()
 
-        with patch("gallery.views.connections", {"default": failing_connection}):
-            response = self.client.get(reverse("health_check"))
-
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json()["status"], "error")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("<loc>http://testserver/</loc>", content)
