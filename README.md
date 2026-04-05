@@ -1,39 +1,19 @@
-<h1 align="center">Django Photo Gallery</h1>
+<h1 align="center">Django Photo Gallery for Timeweb Shared Hosting</h1>
 
 <p align="center">
-  A personal photo gallery that feels like a viewing space first and an admin panel second.
+  This branch contains the shared-hosting adaptation of the project for Timeweb virtual hosting.
   <br />
-  Fast browsing, fullscreen viewing, optimized image delivery, and a Django backend that is ready to grow up.
+  Apache + mod_wsgi, MySQL, no Docker, no Celery, no Redis, no long-running background workers.
 </p>
 
 <p align="center">
-  <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
-    <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
-  </a>
-  <a href="https://www.python.org/downloads/release/python-3110/">
-    <img alt="Python 3.11" src="https://img.shields.io/badge/Python-3.11-2F6DB3?logo=python&logoColor=white">
-  </a>
-  <a href="https://www.djangoproject.com/">
-    <img alt="Django 3.2" src="https://img.shields.io/badge/Django-3.2-0C4B33?logo=django&logoColor=white">
-  </a>
-  <a href="https://www.postgresql.org/">
-    <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white">
-  </a>
-  <a href="LICENSE">
-    <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-F2C94C">
-  </a>
-</p>
-
-<p align="center">
-  <a href="#through-the-lens">Through the Lens</a>
+  <a href="https://tgeruzov.ru/"><strong>Live example</strong></a>
   ·
-  <a href="#darkroom-pipeline">Darkroom Pipeline</a>
+  <a href="https://github.com/tgeruzov/django-photo-gallery/blob/main/README.md">Main README</a>
   ·
-  <a href="#choose-your-setup">Choose Your Setup</a>
+  <a href="https://github.com/tgeruzov/django-photo-gallery/blob/main/README.ru.md">Main README (RU)</a>
   ·
-  <a href="#field-notes">Field Notes</a>
-  ·
-  <a href="#community">Community</a>
+  <a href="docs/timeweb-deploy.md">Full Timeweb Guide</a>
 </p>
 
 <p align="center">
@@ -42,223 +22,120 @@
   <img src="docs/lightbox-preview.jpg" alt="Lightbox preview" width="32%">
 </p>
 
-## Through the Lens
+## What This Branch Is For
 
-This project is built around the act of looking at photos.
+Use `deploy/timeweb-shared` if your target is **Timeweb shared hosting**, not a VPS.
 
-- Visitors get a dense, scrollable gallery with fullscreen viewing and mobile-friendly navigation.
-- Staff users get a focused upload flow instead of a cluttered content system.
-- The backend generates optimized versions and thumbnails so the gallery feels fast without manual asset prep.
-- The repo itself is set up for long-term maintenance: split settings, Docker workflows, CI, linting, and Celery-ready background processing.
+This branch exists to make the project fit the real constraints of shared hosting:
 
-<table>
-  <tr>
-    <td width="33%">
-      <strong>For viewers</strong>
-      <br />
-      Infinite scroll, stable image grid, fullscreen lightbox, keyboard navigation, mobile swipe support.
-    </td>
-    <td width="33%">
-      <strong>For maintainers</strong>
-      <br />
-      Split Django settings, production-like Docker profile, Celery worker path, shared media/static volumes.
-    </td>
-    <td width="33%">
-      <strong>For contributors</strong>
-      <br />
-      Pre-commit, Ruff, Black, GitHub Actions, tests for upload flow, image derivatives, and API behavior.
-    </td>
-  </tr>
-</table>
+- Apache + `mod_wsgi`
+- no Docker
+- no Celery / Redis
+- no `systemd`
+- no custom Nginx
+- limited server access
+- MySQL-first configuration
+- cron only through the hosting panel
 
-## Darkroom Pipeline
+If you want the general product overview, development workflow, and repo-wide documentation, use the main branch README instead:
 
-```mermaid
-flowchart LR
-    A["Staff upload"] --> B["Validation"]
-    B --> C["Photo record"]
-    C --> D["Original media"]
-    C --> E["Derivative generation"]
-    E --> F["Optimized image"]
-    E --> G["Thumbnail"]
-    G --> H["Gallery grid"]
-    F --> I["Lightbox view"]
-    G --> J["JSON API"]
-    E --> K["Celery task or eager local fallback"]
-```
+- [Main README](https://github.com/tgeruzov/django-photo-gallery/blob/main/README.md)
+- [Main README (RU)](https://github.com/tgeruzov/django-photo-gallery/blob/main/README.ru.md)
 
-The same photo moves through a small but deliberate pipeline:
+## What Is Included Here
 
-1. A staff user uploads one or more files.
-2. The app validates format and size, then stores the source image.
-3. Optimized and thumbnail variants are generated.
-4. The gallery grid uses lighter assets, while fullscreen viewing uses the larger optimized version.
-5. In development this can run eagerly, and in production-like mode it can be handed off to Celery.
+This branch adds the files needed for Timeweb shared hosting:
 
-## What Makes It Feel Different
+- [`config/settings_shared.py`](config/settings_shared.py)
+- [`.env.shared.example`](.env.shared.example)
+- [`wsgi.py`](wsgi.py)
+- [`.htaccess`](.htaccess)
+- [`requirements-shared.txt`](requirements-shared.txt)
+- [`docs/timeweb-deploy.md`](docs/timeweb-deploy.md)
+- [`gallery/management/commands/process_photo_derivatives.py`](gallery/management/commands/process_photo_derivatives.py)
 
-### Browsing is the product
+## Shared-Hosting Behavior
 
-This is not a generic CMS with images attached. The viewing experience is the main feature, so the grid, lazy loading, lightbox, and progressive loading behavior matter as much as the admin flow.
+Compared with a VPS-oriented deployment, this branch changes runtime behavior on purpose:
 
-### The image pipeline is part of the app
+- image derivative generation runs inline inside the web request
+- background processing is optional and only suitable for small cron batches
+- static and media are expected to be served by Apache
+- the configuration is prepared for MySQL on shared hosting
+- heavy platform-specific tooling is removed from the deployment path
 
-Instead of expecting someone to manually prepare assets, the project creates the versions it needs and can backfill missing derivatives later.
+## Quick Start on Timeweb
 
-### The repo is ready for the next step
-
-The project still feels like a personal gallery, but it now has the structure needed for safer iteration: separate settings, quality gates, a documented production path, and background-task support.
-
-## Choose Your Setup
-
-### Fastest start: Docker
+1. Upload this branch into `public_html/`.
+2. Create a virtual environment one level above `public_html/`.
+3. Install shared-safe dependencies:
 
 ```bash
-# Linux / macOS
-cp .env.example .env
-
-# Windows PowerShell
-Copy-Item .env.example .env
-
-docker compose up --build
+cd ~/site
+python3 -m venv venv
+. venv/bin/activate
+pip install --upgrade pip
+pip install -r public_html/requirements-shared.txt
 ```
 
-Open [http://localhost:8000](http://localhost:8000)
+4. Create `.env` from `.env.shared.example` and fill in:
 
-### Local Python setup
+- `SECRET_KEY`
+- `ALLOWED_HOSTS`
+- `CSRF_TRUSTED_ORIGINS`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_HOST`
+- `DB_PORT`
+
+5. Run the release commands:
 
 ```bash
-python -m venv .venv
+cd ~/site/public_html
+export DJANGO_ENV=shared
+python manage.py migrate --settings=config.settings_shared
+python manage.py collectstatic --noinput --settings=config.settings_shared
+python manage.py check --deploy --settings=config.settings_shared
 ```
 
-```bash
-# Windows
-.venv\Scripts\activate
+6. Point the domain to the site, enable SSL in Timeweb, then verify:
 
-# Linux / macOS
-source .venv/bin/activate
-```
+- `/`
+- `/health/`
+- `/admin/`
+- image upload
+- static files
+- media files
 
-```bash
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-```
+## Recommended Timeweb Reading Order
 
-### Production-like rehearsal
+If you are deploying this branch for real, read these files in this order:
 
-```bash
-docker compose -f docker-compose.prod.yml up --build
-```
+1. [`docs/timeweb-deploy.md`](docs/timeweb-deploy.md)
+2. [`.env.shared.example`](.env.shared.example)
+3. [`config/settings_shared.py`](config/settings_shared.py)
+4. [`wsgi.py`](wsgi.py)
+5. [`.htaccess`](.htaccess)
 
-That profile runs:
+## What Not To Use on Shared Hosting
 
-- Django in `prod` mode
-- Gunicorn as the app server
-- Redis for Celery broker/result backend
-- A dedicated Celery worker
-- PostgreSQL for persistence
-- Shared named volumes for `media/` and `staticfiles/`
+These parts of the repo can stay in version control, but they are not part of the Timeweb shared-hosting path:
 
-For localhost smoke tests this profile keeps `SECURE_SSL_REDIRECT=0`, so it stays reachable over plain HTTP. Behind a real HTTPS proxy, turn that back on.
+- `Dockerfile`
+- `docker-compose.yml`
+- `docker-compose.prod.yml`
+- Redis-backed Celery workers
+- VPS-only service files and reverse-proxy configs
 
-## Control Panel
+## Live Example
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Main gallery page with AJAX pagination |
-| `/upload/` | Staff-only multi-file upload page |
-| `/all_photos.json` | Paginated gallery API |
-| `/admin/` | Django admin |
+The Timeweb-adapted version is running here:
 
-### Example API response
+- [https://tgeruzov.ru/](https://tgeruzov.ru/)
 
-```json
-{
-  "photos": [
-    {
-      "id": 1,
-      "url": "/media/thumbnails/2026/02/25/image.webp",
-      "full_url": "/media/optimized/2026/02/25/image.webp",
-      "title": "My photo"
-    }
-  ],
-  "page": 1,
-  "page_size": 100,
-  "has_next": true,
-  "total": 240
-}
-```
+## Need The Full Deployment Walkthrough?
 
-## Field Notes
+Use the dedicated guide:
 
-<details open>
-<summary><strong>Key environment variables</strong></summary>
-
-- Core app: `DJANGO_ENV`, `DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `TIME_ZONE`
-- Database: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_CONN_MAX_AGE`
-- Image pipeline: `MAX_UPLOAD_SIZE_MB`, `MAX_IMAGE_PIXELS`, `MAX_JSON_PAGE_SIZE`, `DELETE_ORIGINAL_AFTER_OPTIMIZE`
-- Background work: `ENABLE_BACKGROUND_TASKS`, `CELERY_TASK_ALWAYS_EAGER`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`
-- Production security: `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`
-- Logging: `LOG_LEVEL`
-
-</details>
-
-<details>
-<summary><strong>Quality gates</strong></summary>
-
-```bash
-pip install -r requirements-dev.txt
-pre-commit install
-pre-commit run --all-files
-python manage.py check
-python manage.py test
-```
-
-GitHub Actions also runs linting, migrations, and tests on `push` and `pull_request`.
-
-</details>
-
-<details>
-<summary><strong>Repository map</strong></summary>
-
-```text
-django-photo-gallery/
-├── config/                  # Django config, split settings, Celery wiring
-├── docs/                    # README assets
-├── gallery/                 # Models, views, services, forms, tests
-├── static/                  # CSS, JS, icons
-├── .github/workflows/       # CI pipeline
-├── docker-compose.yml
-├── docker-compose.prod.yml
-├── pyproject.toml
-├── .pre-commit-config.yaml
-├── requirements.txt
-├── requirements-dev.txt
-└── manage.py
-```
-
-</details>
-
-## Production Checklist
-
-- Set `DJANGO_ENV=prod`
-- Set `DEBUG=0`
-- Use a strong random `SECRET_KEY`
-- Configure strict `ALLOWED_HOSTS`
-- Configure `CSRF_TRUSTED_ORIGINS`
-- Run `python manage.py collectstatic --noinput`
-- Run Redis and a Celery worker
-- Keep `media/` backed up
-- Enable HTTPS redirects in real production
-
-## Community
-
-- [Contributing Guide](CONTRIBUTING.md)
-- [Security Policy](SECURITY.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-
-## License
-
-Released under the MIT License. See [LICENSE](LICENSE).
+- [docs/timeweb-deploy.md](docs/timeweb-deploy.md)
