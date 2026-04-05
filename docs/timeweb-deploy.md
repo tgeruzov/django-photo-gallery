@@ -281,7 +281,7 @@ The shared profile is intentionally conservative:
 - uploads are processed synchronously
 - no queue worker is required
 - `FILE_UPLOAD_MAX_MEMORY_MB` defaults to `2`
-- `MAX_UPLOAD_SIZE_MB` defaults to `25`
+- `MAX_UPLOAD_SIZE_MB` defaults to `100`
 - `MAX_IMAGE_PIXELS` defaults to `60000000`
 - `MAX_JSON_PAGE_SIZE` defaults to `100`
 

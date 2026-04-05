@@ -21,8 +21,8 @@ STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media")).expanduser()
 
-# Lower defaults reduce the chance of exhausting worker memory on shared plans.
-MAX_UPLOAD_SIZE_MB = env_int("MAX_UPLOAD_SIZE_MB", 25)
+# Shared hosting still streams uploads to temp files, so 100 MB per file is acceptable.
+MAX_UPLOAD_SIZE_MB = env_int("MAX_UPLOAD_SIZE_MB", 100)
 MAX_JSON_PAGE_SIZE = max(1, env_int("MAX_JSON_PAGE_SIZE", 100))
 FILE_UPLOAD_MAX_MEMORY_SIZE = max(0, env_int("FILE_UPLOAD_MAX_MEMORY_MB", 2)) * 1024 * 1024
 _shared_max_image_pixels = env_int("MAX_IMAGE_PIXELS", 60_000_000)
