@@ -84,9 +84,13 @@ def build_index_context(request, photos_page):
         "быстрой загрузкой и тщательно подготовленными изображениями."
     )
     if total_count:
-        gallery_description = f"{gallery_description} В коллекции уже опубликовано {total_count} снимков."
+        gallery_description = (
+            f"{gallery_description} В коллекции уже опубликовано {total_count} снимков."
+        )
 
-    featured_photo = next((photo for photo in photos if get_primary_photo_url(request, photo)), None)
+    featured_photo = next(
+        (photo for photo in photos if get_primary_photo_url(request, photo)), None
+    )
     featured_image_url = get_primary_photo_url(request, featured_photo) if featured_photo else None
 
     context = {
@@ -134,7 +138,9 @@ def build_upload_context(request, form):
 
 
 def render_upload_page(request, form, *, status=200):
-    response = render(request, "gallery/upload.html", build_upload_context(request, form), status=status)
+    response = render(
+        request, "gallery/upload.html", build_upload_context(request, form), status=status
+    )
     return with_x_robots_tag(response, NOINDEX_ROBOTS)
 
 
