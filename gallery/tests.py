@@ -1,17 +1,22 @@
 import shutil
 import tempfile
 from io import BytesIO
-from unittest.mock import patch
+from io import StringIO
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.utils import OperationalError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
+from .image_utils import ImageProcessingError
 from .models import Photo
 from .services import ensure_photo_derivatives_by_id, save_uploaded_photo
-from .tasks import schedule_photo_derivatives
+from .tasks import ensure_photo_derivatives_task, schedule_photo_derivatives
 
 
 def build_test_image(filename="test.png", size=(64, 64), color=(255, 0, 0)):
@@ -56,6 +61,25 @@ class PhotoServicesTest(GalleryTestCase):
         self.assertTrue(bool(photo.optimized_image))
         self.assertTrue(bool(photo.thumbnail))
 
+    def test_save_uploaded_photo_cleans_up_files_when_database_save_fails(self):
+        before_files = {
+            path.relative_to(self._temp_media_root)
+            for path in Path(self._temp_media_root).rglob("*")
+            if path.is_file()
+        }
+
+        with patch.object(Photo, "save", side_effect=RuntimeError("db unavailable")):
+            with self.assertRaises(RuntimeError):
+                save_uploaded_photo(build_test_image(filename="rollback.png"))
+
+        after_files = {
+            path.relative_to(self._temp_media_root)
+            for path in Path(self._temp_media_root).rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(after_files, before_files)
+        self.assertEqual(Photo.objects.count(), 0)
+
     @override_settings(DELETE_ORIGINAL_AFTER_OPTIMIZE=True)
     def test_save_uploaded_photo_can_delete_original_after_optimization(self):
         photo = save_uploaded_photo(build_test_image(filename="cleanup.png"))
@@ -86,8 +110,7 @@ class PhotoServicesTest(GalleryTestCase):
         self.assertTrue(updated)
         self.assertTrue(bool(photo.thumbnail))
 
-    @override_settings(ENABLE_BACKGROUND_TASKS=False)
-    def test_schedule_photo_derivatives_processes_inline_when_background_disabled(self):
+    def test_schedule_photo_derivatives_processes_inline(self):
         photo = Photo.objects.create(image=build_test_image(filename="inline.png"))
 
         result = schedule_photo_derivatives(photo.pk)
@@ -97,25 +120,43 @@ class PhotoServicesTest(GalleryTestCase):
         self.assertTrue(bool(photo.optimized_image))
         self.assertTrue(bool(photo.thumbnail))
 
-    @override_settings(ENABLE_BACKGROUND_TASKS=True)
-    def test_schedule_photo_derivatives_falls_back_inline_when_queueing_fails(self):
-        photo = Photo.objects.create(image=build_test_image(filename="fallback.png"))
+    def test_schedule_photo_derivatives_returns_failed_for_processing_errors(self):
+        photo = Photo.objects.create(image=build_test_image(filename="failed.png"))
 
-        with patch("gallery.tasks.ensure_photo_derivatives_task.delay", side_effect=RuntimeError):
+        with patch(
+            "gallery.tasks.ensure_photo_derivatives_by_id",
+            side_effect=ImageProcessingError("broken image"),
+        ):
             result = schedule_photo_derivatives(photo.pk)
 
-        photo.refresh_from_db()
-        self.assertEqual(result, "processed")
-        self.assertTrue(bool(photo.optimized_image))
-        self.assertTrue(bool(photo.thumbnail))
+        self.assertEqual(result, "failed")
 
-    @override_settings(ENABLE_BACKGROUND_TASKS=True)
-    def test_signal_schedules_background_processing_on_commit(self):
+    def test_signal_schedules_inline_processing_on_commit(self):
         with patch("gallery.signals.schedule_photo_derivatives") as schedule_mock:
             with self.captureOnCommitCallbacks(execute=True):
                 photo = Photo.objects.create(image=build_test_image(filename="queued.png"))
 
         schedule_mock.assert_called_once_with(photo.pk)
+
+    def test_derivative_task_returns_false_for_permanent_image_errors(self):
+        with patch(
+            "gallery.tasks.ensure_photo_derivatives_by_id",
+            side_effect=ImageProcessingError("broken image"),
+        ):
+            result = ensure_photo_derivatives_task(123)
+
+        self.assertFalse(result)
+
+    def test_process_photo_derivatives_command_handles_missing_variants(self):
+        photo = Photo.objects.create(image=build_test_image(filename="batch.png"))
+
+        out = StringIO()
+        call_command("process_photo_derivatives", limit=1, stdout=out)
+
+        photo.refresh_from_db()
+        self.assertTrue(bool(photo.optimized_image))
+        self.assertTrue(bool(photo.thumbnail))
+        self.assertIn("checked=1", out.getvalue())
 
 
 class GalleryViewsTest(GalleryTestCase):
@@ -214,3 +255,19 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["photos"], [])
+
+    def test_health_check_returns_ok(self):
+        response = self.client.get(reverse("health_check"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+        self.assertEqual(response["Cache-Control"], "no-store")
+
+    def test_health_check_returns_service_unavailable_on_db_error(self):
+        failing_connection = MagicMock()
+        failing_connection.cursor.side_effect = OperationalError("db unavailable")
+
+        with patch("gallery.views.connections", {"default": failing_connection}):
+            response = self.client.get(reverse("health_check"))
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["status"], "error")

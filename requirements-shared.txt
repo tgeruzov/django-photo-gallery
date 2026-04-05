@@ -1,0 +1,5 @@
+Django==3.2.25
+python-dotenv==0.20.0
+Pillow==8.4.0
+django-cleanup==8.1.0
+mysqlclient==2.1.1

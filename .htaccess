@@ -1,0 +1,14 @@
+Options -Indexes +ExecCGI
+AddHandler wsgi-script .py
+DirectoryIndex wsgi.py
+
+RewriteEngine On
+
+RewriteRule ^$ /wsgi.py [QSA,PT,L]
+
+# Serve collected static assets from STATIC_ROOT while keeping URLs at /static/.
+RewriteRule ^static/(.*)$ /staticfiles/$1 [L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ /wsgi.py/$1 [QSA,PT,L]

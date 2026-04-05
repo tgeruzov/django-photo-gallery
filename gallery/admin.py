@@ -72,16 +72,13 @@ class PhotoAdmin(admin.ModelAdmin):
 
     @admin.action(description="Generate missing derivatives")
     def generate_missing_derivatives(self, request, queryset):
-        scheduled = 0
         processed = 0
         skipped = 0
         failed = 0
 
         for photo_id in queryset.values_list("id", flat=True):
             result = schedule_photo_derivatives(photo_id)
-            if result == "scheduled":
-                scheduled += 1
-            elif result == "processed":
+            if result == "processed":
                 processed += 1
             elif result == "skipped":
                 skipped += 1
@@ -91,8 +88,8 @@ class PhotoAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             (
-                "Derivative jobs: "
-                f"scheduled={scheduled}, processed={processed}, skipped={skipped}, failed={failed}."
+                "Derivative processing: "
+                f"processed={processed}, skipped={skipped}, failed={failed}."
             ),
             level=messages.WARNING if failed else messages.INFO,
         )
