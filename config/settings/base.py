@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.sitemaps",
     "django.contrib.staticfiles",
     "gallery.apps.GalleryConfig",
     "django_cleanup.apps.CleanupConfig",
@@ -110,6 +111,15 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+SITE_NAME = os.environ.get("SITE_NAME", "Timur Geruzov")
+SITE_LOCALE = os.environ.get("SITE_LOCALE", "ru_RU")
+DEFAULT_META_DESCRIPTION = os.environ.get(
+    "DEFAULT_META_DESCRIPTION",
+    (
+        "Авторская фотогалерея Тимура Герузова с полноэкранным просмотром, "
+        "оптимизированной загрузкой и акцентом на визуальную подачу."
+    ),
+)
 MAX_UPLOAD_SIZE_MB = env_int("MAX_UPLOAD_SIZE_MB", 100)
 MAX_JSON_PAGE_SIZE = max(1, env_int("MAX_JSON_PAGE_SIZE", 200))
 _max_image_pixels = env_int("MAX_IMAGE_PIXELS", 0)

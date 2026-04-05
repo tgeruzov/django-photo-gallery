@@ -1,34 +1,48 @@
-{% extends "gallery/base.html" %} {% load static %} {% block title %}Timur Geruzov{% endblock %} {% block content %}
-{% if messages %}
-<div class="upload-container">
-  {% for message in messages %}
-  <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-  {% endfor %}
-</div>
-{% endif %}
-<div class="gallery" id="gallery" data-all-photos-url="{% url 'all_photos_json' %}">{% include "gallery/partials/photo_cards.html" with photos=photos_page %}</div>
-<div
-  class="gallery-feed-status"
-  id="gallery-feed-status"
-  aria-live="polite"
-  data-state="idle"
-  hidden
-></div>
-<div
-  class="gallery-sentinel"
-  id="gallery-sentinel"
-  aria-hidden="true"
-  data-current-page="{{ photos_page.number }}"
-  data-has-next="{% if photos_page.has_next %}true{% else %}false{% endif %}"
-></div>
-<div class="lightbox" id="lightbox">
-  <button class="lightbox-prev" aria-label="Предыдущее фото">
-    <span class="material-icons">chevron_left</span>
-  </button>
-  <img src="" alt="Увеличенное изображение" />
-  <button class="lightbox-next" aria-label="Следующее фото">
-    <span class="material-icons">chevron_right</span>
-  </button>
-  <div class="lightbox-hint">Тапните по краям для переключения</div>
-</div>
-{% endblock %} {% block scripts %} {{ block.super }} {% endblock %}
+{% extends "gallery/base.html" %}
+
+{% block extra_meta %}
+  {% if seo_structured_data %}
+  <script type="application/ld+json">{{ seo_structured_data|safe }}</script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if messages %}
+  <div class="upload-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="gallery" id="gallery" data-all-photos-url="{% url 'all_photos_json' %}">
+    {% include "gallery/partials/photo_cards.html" with photos=photos_page %}
+  </div>
+
+  <div
+    class="gallery-feed-status"
+    id="gallery-feed-status"
+    aria-live="polite"
+    data-state="idle"
+    hidden
+  ></div>
+
+  <div
+    class="gallery-sentinel"
+    id="gallery-sentinel"
+    aria-hidden="true"
+    data-current-page="{{ photos_page.number }}"
+    data-has-next="{% if photos_page.has_next %}true{% else %}false{% endif %}"
+  ></div>
+
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-prev" aria-label="Предыдущее фото">
+      <span class="material-icons">chevron_left</span>
+    </button>
+    <img src="" alt="Увеличенное изображение" />
+    <button class="lightbox-next" aria-label="Следующее фото">
+      <span class="material-icons">chevron_right</span>
+    </button>
+    <div class="lightbox-hint">Тапните по краям для переключения</div>
+  </div>
+{% endblock %}

@@ -22,6 +22,10 @@ class Photo(models.Model):
     def has_complete_variants(self):
         return bool(self.optimized_image and self.thumbnail)
 
+    @property
+    def display_label(self):
+        return self.alt_text or self.title or (f"Фотография {self.pk}" if self.pk else "Фотография")
+
     def __str__(self):
         if self.title:
             return self.title
