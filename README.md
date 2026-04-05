@@ -13,7 +13,9 @@
   ·
   <a href="https://github.com/tgeruzov/django-photo-gallery/blob/main/README.ru.md">Main README (RU)</a>
   ·
-  <a href="docs/timeweb-deploy.md">Full Timeweb Guide</a>
+  <a href="docs/timeweb-deploy.md">Full Timeweb Guide (EN)</a>
+  ·
+  <a href="docs/timeweb-deploy.ru.md">Full Timeweb Guide (RU)</a>
 </p>
 
 <p align="center">
@@ -52,6 +54,7 @@ This branch adds the files needed for Timeweb shared hosting:
 - [`.htaccess`](.htaccess)
 - [`requirements-shared.txt`](requirements-shared.txt)
 - [`docs/timeweb-deploy.md`](docs/timeweb-deploy.md)
+- [`docs/timeweb-deploy.ru.md`](docs/timeweb-deploy.ru.md)
 - [`gallery/management/commands/process_photo_derivatives.py`](gallery/management/commands/process_photo_derivatives.py)
 
 ## Shared-Hosting Behavior
@@ -112,7 +115,7 @@ python manage.py check --deploy --settings=config.settings_shared
 
 If you are deploying this branch for real, read these files in this order:
 
-1. [`docs/timeweb-deploy.md`](docs/timeweb-deploy.md)
+1. [`docs/timeweb-deploy.md`](docs/timeweb-deploy.md) or [`docs/timeweb-deploy.ru.md`](docs/timeweb-deploy.ru.md)
 2. [`.env.shared.example`](.env.shared.example)
 3. [`config/settings_shared.py`](config/settings_shared.py)
 4. [`wsgi.py`](wsgi.py)
@@ -139,3 +142,4 @@ The Timeweb-adapted version is running here:
 Use the dedicated guide:
 
 - [docs/timeweb-deploy.md](docs/timeweb-deploy.md)
+- [docs/timeweb-deploy.ru.md](docs/timeweb-deploy.ru.md)

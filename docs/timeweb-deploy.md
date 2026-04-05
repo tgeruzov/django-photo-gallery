@@ -1,5 +1,9 @@
 # Timeweb Shared Hosting Deployment Guide
 
+Language:
+- [English](timeweb-deploy.md)
+- [Русский](timeweb-deploy.ru.md)
+
 This project is now adapted for Timeweb virtual hosting with Apache + `mod_wsgi`.
 The deployment target is a shared hosting account, not a VPS:
 
