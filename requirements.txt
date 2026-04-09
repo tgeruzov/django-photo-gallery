@@ -4,5 +4,5 @@ psycopg2-binary==2.9.9
 pillow==9.5.0
 whitenoise==6.9.0
 django-cleanup==9.0.0
-gunicorn==21.2.0
+gunicorn==25.3.0
 celery[redis]==5.4.0
