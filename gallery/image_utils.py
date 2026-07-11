@@ -4,7 +4,7 @@ from io import BytesIO
 
 from django.conf import settings
 from django.core.files.base import ContentFile
-from PIL import ExifTags, Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .constants import (
     OPTIMIZED_IMAGE_QUALITY,
@@ -21,31 +21,24 @@ MAX_IMAGE_PIXELS = getattr(settings, "MAX_IMAGE_PIXELS", None)
 if MAX_IMAGE_PIXELS:
     Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
-ORIENTATION_TAG = next((tag for tag, name in ExifTags.TAGS.items() if name == "Orientation"), None)
-
-
 class ImageProcessingError(Exception):
     pass
 
 
 def fix_image_rotation(img):
-    """Исправляет поворот изображения из EXIF."""
-    if not hasattr(img, "_getexif") or ORIENTATION_TAG is None:
-        return img
+    """Разворачивает изображение по EXIF Orientation (включая зеркальные 2/4/5/7)."""
     try:
-        exif = img._getexif()
-        if exif is None:
-            return img
-        orientation = exif.get(ORIENTATION_TAG, 1)
-        if orientation == 3:
-            img = img.rotate(180, expand=True)
-        elif orientation == 6:
-            img = img.rotate(270, expand=True)
-        elif orientation == 8:
-            img = img.rotate(90, expand=True)
+        return ImageOps.exif_transpose(img)
     except Exception:
         logger.warning("Не удалось обработать EXIF ориентацию")
-    return img
+        return img
+
+
+def normalize_image_mode(img):
+    """Сохраняет альфа-канал (WEBP его поддерживает), остальное приводит к RGB."""
+    if img.mode in ("RGBA", "LA", "P"):
+        return img.convert("RGBA")
+    return img.convert("RGB")
 
 
 def _open_image(image_source):
@@ -67,7 +60,7 @@ def open_image_from_file(file_obj):
     img = _open_image(file_obj)
     file_obj.seek(0)
     img = fix_image_rotation(img)
-    return img.convert("RGB")
+    return normalize_image_mode(img)
 
 
 def open_image_from_path(image_path):
@@ -77,12 +70,15 @@ def open_image_from_path(image_path):
     except FileNotFoundError as exc:
         raise ImageProcessingError("Файл не найден.") from exc
     img = fix_image_rotation(img)
-    return img.convert("RGB")
+    return normalize_image_mode(img)
 
 
 def make_image_variant_buffer(img, size, quality, fmt):
     img_copy = img.copy()
     img_copy.thumbnail(size, Image.Resampling.LANCZOS)
+    if fmt.upper() in {"JPEG", "JPG"} and img_copy.mode not in ("RGB", "L"):
+        # JPEG не умеет альфу — страховка на случай смены THUMBNAIL_FORMAT
+        img_copy = img_copy.convert("RGB")
     buffer = BytesIO()
     save_kwargs = {"format": fmt, "quality": quality}
     if fmt.upper() == "WEBP":
