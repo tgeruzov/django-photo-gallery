@@ -21,6 +21,8 @@
       <div class="preview-container" id="preview-container"></div>
     </form>
 
+    <div id="upload-status" aria-live="polite" hidden></div>
+
     {% if messages %}
       {% for message in messages %}
       <div class="alert alert-{{ message.tags }}">{{ message }}</div>

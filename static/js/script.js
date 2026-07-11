@@ -399,10 +399,14 @@ function initUploadForm() {
   const fileInput = document.getElementById('id_files');
   const preview = document.getElementById('preview-container');
   const submitBtn = document.getElementById('submit-btn');
+  const statusBox = document.getElementById('upload-status');
 
   if (!form || !fileInput || !preview || !submitBtn) return;
 
   let selectedFiles = [];
+  let uploading = false;
+  const previewCache = new Map(); // file -> Promise<dataURL> (J2: не перекодируем повторно)
+  const previewNodes = new Map(); // file -> wrapper element
   submitBtn.disabled = true;
 
   fileInput.addEventListener('change', handleFileSelect);
@@ -457,6 +461,7 @@ function initUploadForm() {
 
   async function renderPreviews() {
       preview.innerHTML = '';
+      previewNodes.clear();
 
       for (let i = 0; i < selectedFiles.length; i++) {
           const file = selectedFiles[i];
@@ -473,28 +478,49 @@ function initUploadForm() {
           removeBtn.setAttribute('aria-label', `Удалить ${file.name}`);
           removeBtn.textContent = '×';
           removeBtn.addEventListener('click', () => {
+              if (uploading) return;
               selectedFiles.splice(i, 1);
+              previewCache.delete(file);
               updateFileInput();
               renderPreviews();
           });
 
           wrapper.append(img, removeBtn);
           preview.appendChild(wrapper);
+          previewNodes.set(file, wrapper);
 
-          if (file.type.startsWith('image/')) {
-              img.src = await createPreview(file);
+          const dataUrl = await getPreview(file);
+          if (dataUrl) {
+              img.src = dataUrl;
           }
 
           wrapper.classList.add('loaded');
       }
 
-      submitBtn.disabled = selectedFiles.length === 0;
+      submitBtn.disabled = selectedFiles.length === 0 || uploading;
+  }
+
+  // J2: превью кодируется один раз на файл; добавление/удаление других
+  // файлов больше не перегоняет весь список через canvas заново.
+  function getPreview(file) {
+      if (!previewCache.has(file)) {
+          previewCache.set(file, createPreview(file));
+      }
+      return previewCache.get(file);
   }
 
   function createPreview(file) {
       return new Promise(resolve => {
+          if (!file.type.startsWith('image/')) {
+              resolve('');
+              return;
+          }
           const img = new Image();
           const reader = new FileReader();
+          // J1: битый файл резолвится плейсхолдером, а не вечным await
+          const fail = () => resolve('');
+          reader.onerror = fail;
+          img.onerror = fail;
           reader.onload = e => {
               img.onload = () => {
                   const canvas = document.createElement('canvas');
@@ -510,39 +536,116 @@ function initUploadForm() {
       });
   }
 
+  function setPreviewState(file, state) {
+      const wrapper = previewNodes.get(file);
+      if (!wrapper) return;
+      wrapper.classList.remove('is-uploading', 'is-done', 'is-duplicate', 'is-error');
+      if (state) {
+          wrapper.classList.add(`is-${state}`);
+      }
+  }
+
+  function setUploadStatus(message, kind) {
+      if (!statusBox) return;
+      statusBox.textContent = message;
+      statusBox.className = message ? `alert alert-${kind || 'info'}` : '';
+      statusBox.hidden = !message;
+  }
+
+  // U1: файлы уходят последовательно, по одному запросу на файл —
+  // виден прогресс, обрыв не теряет весь пакет, ретрай не дублирует
+  // уже загруженное (сервер отсекает дубликаты по хешу).
   async function handleFormSubmit(e) {
       e.preventDefault();
-      if (!selectedFiles.length) return;
+      if (!selectedFiles.length || uploading) return;
 
+      uploading = true;
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Загружаем...';
+      preview.classList.add('is-busy');
+      setUploadStatus('', '');
 
-      try {
-          const formData = new FormData(form);
-          const response = await fetch(form.action, {
-              method: 'POST',
-              headers: {
-                  'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value,
-                  'X-Requested-With': 'XMLHttpRequest',
-              },
-              body: formData,
-          });
+      const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+      const total = selectedFiles.length;
+      const failedFiles = [];
+      const failedMessages = [];
+      let uploadedCount = 0;
+      let duplicateCount = 0;
+      let redirectUrl = '/';
 
-          const result = await response.json();
+      for (let i = 0; i < total; i++) {
+          const file = selectedFiles[i];
+          submitBtn.textContent = `Загружаем ${i + 1} из ${total}...`;
+          setPreviewState(file, 'uploading');
 
-          if (response.ok && result.success) {
-              selectedFiles = [];
-              updateFileInput();
-              preview.innerHTML = '';
-              window.location.href = result.redirect_url;
-          } else {
-              throw new Error(result.error || 'Ошибка загрузки');
+          try {
+              const formData = new FormData();
+              formData.append('files', file);
+              const response = await fetch(form.action, {
+                  method: 'POST',
+                  headers: {
+                      'X-CSRFToken': csrfToken,
+                      'X-Requested-With': 'XMLHttpRequest',
+                  },
+                  body: formData,
+              });
+
+              // J3: истёкшая сессия отвечает HTML-редиректом на логин —
+              // отправляем пользователя туда вместо SyntaxError из json().
+              const contentType = response.headers.get('content-type') || '';
+              if (response.redirected || !contentType.includes('application/json')) {
+                  window.location.href = response.url || form.action;
+                  return;
+              }
+
+              const result = await response.json();
+              if (response.ok && result.success) {
+                  redirectUrl = result.redirect_url || redirectUrl;
+                  if (result.duplicates && result.duplicates.length) {
+                      duplicateCount += 1;
+                      setPreviewState(file, 'duplicate');
+                  } else {
+                      uploadedCount += 1;
+                      setPreviewState(file, 'done');
+                  }
+              } else {
+                  const detail =
+                      (result.errors && result.errors[0]) || result.error || 'ошибка загрузки';
+                  failedFiles.push(file);
+                  failedMessages.push(detail);
+                  setPreviewState(file, 'error');
+              }
+          } catch (error) {
+              failedFiles.push(file);
+              failedMessages.push(`${file.name}: сеть недоступна или сервер не ответил`);
+              setPreviewState(file, 'error');
           }
-      } catch (error) {
-          alert('Ошибка: ' + error.message);
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Опубликовать';
       }
+
+      uploading = false;
+      preview.classList.remove('is-busy');
+
+      if (!failedFiles.length) {
+          window.location.href = redirectUrl;
+          return;
+      }
+
+      selectedFiles = failedFiles;
+      updateFileInput();
+      // Перерендер, чтобы кнопки удаления ссылались на актуальные индексы
+      await renderPreviews();
+      failedFiles.forEach(file => setPreviewState(file, 'error'));
+
+      const summary = [];
+      if (uploadedCount) summary.push(`загружено: ${uploadedCount}`);
+      if (duplicateCount) summary.push(`дубликатов пропущено: ${duplicateCount}`);
+      summary.push(`с ошибкой: ${failedFiles.length}`);
+      setUploadStatus(
+          `Готово не всё (${summary.join(', ')}). ${failedMessages.join(' ')}`,
+          'danger'
+      );
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = `Повторить (${failedFiles.length})`;
   }
 }
 
