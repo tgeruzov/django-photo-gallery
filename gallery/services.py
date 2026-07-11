@@ -2,13 +2,11 @@ import logging
 import os
 
 from django.conf import settings
-from django.core.files.base import ContentFile
 from django.db import transaction
 
 from .image_utils import (
     build_optimized_content,
     build_thumbnail_content,
-    open_image_from_file,
     open_image_from_path,
 )
 from .models import Photo
@@ -29,30 +27,21 @@ def cleanup_saved_photo_files(photo):
 
 
 def save_uploaded_photo(uploaded_file):
-    """Persist the original upload and eagerly generate its derived files."""
-    uploaded_file.seek(0)
-    image = open_image_from_file(uploaded_file)
-    optimized_content = build_optimized_content(image, uploaded_file.name)
-    thumbnail_content = build_thumbnail_content(image, uploaded_file.name)
+    """Persist the original upload; derived files are generated after commit.
 
+    Варианты (optimized + thumbnail) создаёт post_save-сигнал через
+    schedule_photo_derivatives — в Celery-воркере или inline-фолбэком, —
+    чтобы HTTP-запрос не ждал перекодирования. Оригинал пишется в storage
+    потоково, без чтения файла целиком в память.
+    """
     uploaded_file.seek(0)
     original_name = os.path.basename(uploaded_file.name)
-    original_content = ContentFile(uploaded_file.read(), name=original_name)
 
     photo = Photo()
     try:
         with transaction.atomic():
-            photo.image.save(original_name, original_content, save=False)
-            photo.optimized_image.save(optimized_content.name, optimized_content, save=False)
-            photo.thumbnail.save(thumbnail_content.name, thumbnail_content, save=False)
-            photo.optimized_width, photo.optimized_height = optimized_content.image_dimensions
-            photo.thumbnail_width, photo.thumbnail_height = thumbnail_content.image_dimensions
+            photo.image.save(original_name, uploaded_file, save=False)
             photo.save()
-
-            if getattr(settings, "DELETE_ORIGINAL_AFTER_OPTIMIZE", False):
-                photo.image.delete(save=False)
-                photo.image = ""
-                photo.save(update_fields=["image"])
     except Exception:
         cleanup_saved_photo_files(photo)
         raise

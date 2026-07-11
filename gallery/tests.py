@@ -54,15 +54,19 @@ class PhotoModelTest(GalleryTestCase):
 
 class PhotoServicesTest(GalleryTestCase):
     def test_save_uploaded_photo_creates_all_variants(self):
-        photo = save_uploaded_photo(build_test_image(filename="service.png"))
+        with self.captureOnCommitCallbacks(execute=True):
+            photo = save_uploaded_photo(build_test_image(filename="service.png"))
 
+        photo.refresh_from_db()
         self.assertTrue(bool(photo.image))
         self.assertTrue(bool(photo.optimized_image))
         self.assertTrue(bool(photo.thumbnail))
 
     def test_save_uploaded_photo_stores_variant_dimensions(self):
-        photo = save_uploaded_photo(build_test_image(filename="dims.png", size=(64, 48)))
+        with self.captureOnCommitCallbacks(execute=True):
+            photo = save_uploaded_photo(build_test_image(filename="dims.png", size=(64, 48)))
 
+        photo.refresh_from_db()
         self.assertEqual((photo.thumbnail_width, photo.thumbnail_height), (64, 48))
         self.assertEqual((photo.optimized_width, photo.optimized_height), (64, 48))
 
@@ -87,7 +91,8 @@ class PhotoServicesTest(GalleryTestCase):
 
     @override_settings(DELETE_ORIGINAL_AFTER_OPTIMIZE=True)
     def test_save_uploaded_photo_can_delete_original_after_optimization(self):
-        photo = save_uploaded_photo(build_test_image(filename="cleanup.png"))
+        with self.captureOnCommitCallbacks(execute=True):
+            photo = save_uploaded_photo(build_test_image(filename="cleanup.png"))
         photo.refresh_from_db()
 
         self.assertFalse(bool(photo.image))
@@ -210,11 +215,12 @@ class GalleryViewsTest(GalleryTestCase):
 
     def test_staff_ajax_upload_success_creates_variants(self):
         self.client.login(username="admin", password="pass")
-        response = self.client.post(
-            reverse("upload_photo"),
-            {"files": [build_test_image(filename="valid.png")]},
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("upload_photo"),
+                {"files": [build_test_image(filename="valid.png")]},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["success"])
