@@ -45,6 +45,8 @@ def save_uploaded_photo(uploaded_file):
             photo.image.save(original_name, original_content, save=False)
             photo.optimized_image.save(optimized_content.name, optimized_content, save=False)
             photo.thumbnail.save(thumbnail_content.name, thumbnail_content, save=False)
+            photo.optimized_width, photo.optimized_height = optimized_content.image_dimensions
+            photo.thumbnail_width, photo.thumbnail_height = thumbnail_content.image_dimensions
             photo.save()
 
             if getattr(settings, "DELETE_ORIGINAL_AFTER_OPTIMIZE", False):
@@ -91,12 +93,14 @@ def ensure_photo_derivatives(photo):
     if missing_optimized:
         optimized_content = build_optimized_content(image, source_image.name)
         photo.optimized_image.save(optimized_content.name, optimized_content, save=False)
-        update_fields.append("optimized_image")
+        photo.optimized_width, photo.optimized_height = optimized_content.image_dimensions
+        update_fields.extend(["optimized_image", "optimized_width", "optimized_height"])
 
     if missing_thumbnail:
         thumbnail_content = build_thumbnail_content(image, source_image.name)
         photo.thumbnail.save(thumbnail_content.name, thumbnail_content, save=False)
-        update_fields.append("thumbnail")
+        photo.thumbnail_width, photo.thumbnail_height = thumbnail_content.image_dimensions
+        update_fields.extend(["thumbnail", "thumbnail_width", "thumbnail_height"])
 
     if delete_original and photo.optimized_image and photo.thumbnail:
         photo.image.delete(save=False)

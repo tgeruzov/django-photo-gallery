@@ -89,13 +89,15 @@ def make_image_variant_buffer(img, size, quality, fmt):
         save_kwargs["method"] = 6
     img_copy.save(buffer, **save_kwargs)
     buffer.seek(0)
-    return buffer
+    return buffer, img_copy.size
 
 
 def make_webp_content(img, size, quality, suffix, base_name):
-    buffer = make_image_variant_buffer(img, size, quality, "WEBP")
+    buffer, dimensions = make_image_variant_buffer(img, size, quality, "WEBP")
     filename = f"{base_name}{suffix}.webp"
-    return ContentFile(buffer.getvalue(), name=filename)
+    content = ContentFile(buffer.getvalue(), name=filename)
+    content.image_dimensions = dimensions
+    return content
 
 
 def build_optimized_content(img, original_name):
@@ -109,6 +111,10 @@ def build_thumbnail_content(img, original_name):
     base_name = os.path.splitext(os.path.basename(original_name))[0]
     if THUMBNAIL_FORMAT.upper() == "WEBP":
         return make_webp_content(img, THUMBNAIL_SIZE, THUMBNAIL_QUALITY, "_thumb", base_name)
-    buffer = make_image_variant_buffer(img, THUMBNAIL_SIZE, THUMBNAIL_QUALITY, THUMBNAIL_FORMAT)
+    buffer, dimensions = make_image_variant_buffer(
+        img, THUMBNAIL_SIZE, THUMBNAIL_QUALITY, THUMBNAIL_FORMAT
+    )
     filename = f"{base_name}_thumb.{THUMBNAIL_FORMAT.lower()}"
-    return ContentFile(buffer.getvalue(), name=filename)
+    content = ContentFile(buffer.getvalue(), name=filename)
+    content.image_dimensions = dimensions
+    return content

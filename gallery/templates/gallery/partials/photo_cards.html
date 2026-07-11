@@ -1,5 +1,5 @@
 {% load static %} {% for photo in photos %}
-{% with photo_label=photo.display_label %}
+{% with photo_label=photo.display_label dims=photo.display_dimensions %}
   {% if photo.thumbnail and photo.optimized_image %}
   <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
     <img
@@ -9,8 +9,7 @@
       src="{{ photo.thumbnail.url }}"
       alt="{{ photo_label }}"
       data-full="{{ photo.optimized_image.url }}"
-      width="{{ photo.thumbnail.width }}"
-      height="{{ photo.thumbnail.height }}"
+      {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
     />
   </button>
   {% elif photo.thumbnail and photo.image %}
@@ -22,8 +21,7 @@
       src="{{ photo.thumbnail.url }}"
       alt="{{ photo_label }}"
       data-full="{{ photo.image.url }}"
-      width="{{ photo.thumbnail.width }}"
-      height="{{ photo.thumbnail.height }}"
+      {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
     />
   </button>
   {% elif photo.optimized_image %}
@@ -35,8 +33,7 @@
       src="{{ photo.optimized_image.url }}"
       alt="{{ photo_label }}"
       data-full="{{ photo.optimized_image.url }}"
-      width="{{ photo.optimized_image.width }}"
-      height="{{ photo.optimized_image.height }}"
+      {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
     />
   </button>
   {% elif photo.image %}
@@ -48,8 +45,7 @@
       src="{{ photo.image.url }}"
       alt="{{ photo_label }}"
       data-full="{{ photo.image.url }}"
-      width="{{ photo.image.width }}"
-      height="{{ photo.image.height }}"
+      {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
     />
   </button>
   {% else %}

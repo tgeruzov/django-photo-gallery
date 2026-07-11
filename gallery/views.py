@@ -33,7 +33,7 @@ def is_ajax(request):
 
 
 def serialize_photo(photo):
-    display_image = photo.thumbnail or photo.optimized_image or photo.image
+    display_image = photo.display_file
     full_image = photo.optimized_image or photo.image
 
     if not full_image:
@@ -49,15 +49,7 @@ def serialize_photo(photo):
     except ValueError:
         preview_url = full_url
 
-    width = None
-    height = None
-    if display_image:
-        try:
-            width = display_image.width
-            height = display_image.height
-        except (ValueError, FileNotFoundError, OSError):
-            width = None
-            height = None
+    width, height = photo.display_dimensions
 
     return {
         "id": photo.id,

@@ -102,11 +102,10 @@ def build_gallery_structured_data(request, photos, *, title, description):
         }
 
         image_file = get_primary_photo_file(photo)
-        try:
-            image_object["width"] = image_file.width
-            image_object["height"] = image_file.height
-        except (AttributeError, FileNotFoundError, OSError, ValueError):
-            pass
+        width, height = photo.file_dimensions(image_file)
+        if width and height:
+            image_object["width"] = width
+            image_object["height"] = height
 
         image_objects.append(image_object)
 

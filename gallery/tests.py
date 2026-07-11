@@ -60,6 +60,12 @@ class PhotoServicesTest(GalleryTestCase):
         self.assertTrue(bool(photo.optimized_image))
         self.assertTrue(bool(photo.thumbnail))
 
+    def test_save_uploaded_photo_stores_variant_dimensions(self):
+        photo = save_uploaded_photo(build_test_image(filename="dims.png", size=(64, 48)))
+
+        self.assertEqual((photo.thumbnail_width, photo.thumbnail_height), (64, 48))
+        self.assertEqual((photo.optimized_width, photo.optimized_height), (64, 48))
+
     def test_save_uploaded_photo_cleans_up_files_when_database_save_fails(self):
         before_files = {
             path.relative_to(self._temp_media_root)
@@ -171,6 +177,14 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertIn('"@type": "ImageGallery"', content)
         self.assertIn("Вечерняя панорама города", content)
         self.assertContains(response, "Фотогалерея Тимура Герузова")
+
+    def test_index_survives_missing_thumbnail_file(self):
+        photo = Photo.objects.create(image=build_test_image(filename="orphan.png"))
+        Photo.objects.filter(pk=photo.pk).update(thumbnail="thumbnails/gone/missing.webp")
+
+        response = self.client.get(reverse("index"))
+
+        self.assertEqual(response.status_code, 200)
 
     def test_structured_data_escapes_script_close(self):
         Photo.objects.create(
