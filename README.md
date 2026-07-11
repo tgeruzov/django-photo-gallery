@@ -32,7 +32,7 @@
     <img alt="Python 3.11" src="https://img.shields.io/badge/Python-3.11-2F6DB3?logo=python&logoColor=white">
   </a>
   <a href="https://www.djangoproject.com/">
-    <img alt="Django 3.2" src="https://img.shields.io/badge/Django-3.2-0C4B33?logo=django&logoColor=white">
+    <img alt="Django 5.2" src="https://img.shields.io/badge/Django-5.2-0C4B33?logo=django&logoColor=white">
   </a>
   <a href="https://www.postgresql.org/">
     <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white">
