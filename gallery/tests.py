@@ -174,6 +174,17 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertIn("Вечерняя панорама города", content)
         self.assertContains(response, "Фотогалерея Тимура Герузова")
 
+    def test_structured_data_escapes_script_close(self):
+        Photo.objects.create(
+            image=build_test_image(filename="xss.png"),
+            title="</script><script>alert(1)</script>",
+        )
+
+        response = self.client.get(reverse("index"))
+
+        self.assertNotContains(response, "</script><script>alert(1)</script>")
+        self.assertContains(response, "<\\/script><script>alert(1)<\\/script>")
+
     def test_upload_requires_login(self):
         response = self.client.get(reverse("upload_photo"))
         self.assertEqual(response.status_code, 302)

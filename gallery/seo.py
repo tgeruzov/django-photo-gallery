@@ -122,10 +122,13 @@ def build_gallery_structured_data(request, photos, *, title, description):
             }
         )
 
-    return json.dumps(
+    payload = json.dumps(
         {
             "@context": "https://schema.org",
             "@graph": graph,
         },
         ensure_ascii=False,
     )
+    # json.dumps не экранирует "</" — без замены строка "</script>" в title/alt_text
+    # закрыла бы JSON-LD-блок и исполнилась как HTML (stored XSS).
+    return payload.replace("</", "<\\/")
