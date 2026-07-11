@@ -316,6 +316,58 @@ html.js .card:not(.loaded) {
   max-width: 90%;
   max-height: 90%;
   border-radius: var(--radius);
+  transition: filter var(--transition-speed) ease;
+}
+
+/* Blur-up: пока грузится полная версия, показываем размытую миниатюру */
+.lightbox img.is-loading {
+  filter: blur(8px);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(40, 40, 40, 0.35);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1010;
+  box-shadow: 0 2px 8px rgba(40, 40, 40, 0.15);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.lightbox-close:hover {
+  background: rgba(40, 40, 40, 0.5);
+  transform: scale(1.1);
+}
+
+.lightbox-close:active {
+  transform: scale(0.95);
+}
+
+.lightbox-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.lightbox-counter {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 0.95rem;
+  opacity: 0.85;
+  z-index: 1010;
+  text-shadow: 0 1px 4px #000;
+  pointer-events: none;
 }
 
 .lightbox-prev,

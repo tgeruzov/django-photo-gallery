@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
   setupThemeSwitcher();
   initGallery();
-  initLightbox();
   initUploadForm();
 });
 
@@ -10,7 +9,8 @@ function initGallery() {
   if (!gallery) return;
 
   const cardRevealer = initLazyLoad(gallery);
-  setupInfiniteScroll(gallery, cardRevealer);
+  const feed = setupInfiniteScroll(gallery, cardRevealer);
+  initLightbox(gallery, feed);
 }
 
 function setupThemeSwitcher() {
@@ -96,16 +96,22 @@ function initLazyLoad(container) {
   return api;
 }
 
-function initLightbox() {
+function initLightbox(gallery, feed) {
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = lightbox ? lightbox.querySelector('img') : null;
-  const gallery = document.getElementById('gallery');
   if (!lightbox || !lightboxImg || !gallery) return;
 
-  const allPhotosUrl = gallery.dataset.allPhotosUrl || '/all_photos.json';
-  let allPhotos = getVisiblePhotos();
-  let allPhotosPromise = null;
+  // P2: лайтбокс работает по уже загруженным карточкам и догружает
+  // следующую страницу ленты по необходимости — без выкачивания всей
+  // библиотеки метаданных при первом клике.
+  let allPhotos = [];
   let currentIndex = -1;
+  let lastFocused = null;
+
+  const closeBtn = lightbox.querySelector('.lightbox-close');
+  const prevBtn = lightbox.querySelector('.lightbox-prev');
+  const nextBtn = lightbox.querySelector('.lightbox-next');
+  const counter = lightbox.querySelector('.lightbox-counter');
 
   function getVisiblePhotos() {
     return Array.from(gallery.querySelectorAll('.card img'))
@@ -117,59 +123,78 @@ function initLightbox() {
       .filter(photo => photo.url && photo.full_url);
   }
 
-  function ensureAllPhotosLoaded() {
-    if (allPhotosPromise) return allPhotosPromise;
+  function updateCounter() {
+    if (!counter) return;
+    counter.textContent = currentIndex >= 0 && allPhotos.length
+      ? `${currentIndex + 1} / ${allPhotos.length}`
+      : '';
+  }
 
-    allPhotosPromise = fetchAllPhotos(allPhotosUrl)
-      .then(photos => {
-          if (Array.isArray(photos) && photos.length) {
-              allPhotos = photos;
-          }
-          return allPhotos;
-      })
-      .catch(() => {
-          // Фолбэк на локально видимые фото и возможность повторной попытки позже
-          allPhotos = getVisiblePhotos();
-          allPhotosPromise = null;
-          return allPhotos;
-      });
-
-    return allPhotosPromise;
+  function preloadNeighbors(index) {
+    [index - 1, index + 1].forEach(i => {
+      if (i >= 0 && i < allPhotos.length) {
+        new Image().src = allPhotos[i].full_url;
+      }
+    });
   }
 
   function showPhoto(index) {
     if (index < 0 || index >= allPhotos.length) return;
     currentIndex = index;
-    lightboxImg.src = allPhotos[index].full_url;
-    lightboxImg.alt = allPhotos[index].title || 'Увеличенное изображение';
-    lightbox.classList.add('active');
+    const photo = allPhotos[index];
+
+    // Blur-up: мгновенно показываем миниатюру из кэша,
+    // полную версию подменяем по её загрузке.
+    lightboxImg.classList.add('is-loading');
+    lightboxImg.src = photo.url;
+    lightboxImg.alt = photo.title || 'Увеличенное изображение';
+
+    const full = new Image();
+    full.onload = () => {
+      if (currentIndex !== index) return;
+      lightboxImg.src = photo.full_url;
+      lightboxImg.classList.remove('is-loading');
+    };
+    full.onerror = () => {
+      if (currentIndex === index) lightboxImg.classList.remove('is-loading');
+    };
+    full.src = photo.full_url;
+
+    updateCounter();
+    preloadNeighbors(index);
     showSwipeHint();
+  }
+
+  function openLightbox(index) {
+    lastFocused = document.activeElement;
+    lightbox.classList.add('active');
+    lightbox.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    showPhoto(index);
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove('active');
+    document.body.style.overflow = '';
+    if (lastFocused && typeof lastFocused.focus === 'function') {
+      lastFocused.focus();
+    }
+    lastFocused = null;
+    lightbox.setAttribute('aria-hidden', 'true');
+    lightboxImg.src = '';
+    currentIndex = -1;
+    updateCounter();
   }
 
   function openFromImage(img) {
     const fullUrl = img ? img.getAttribute('data-full') : '';
     if (!fullUrl) return;
 
-    if (!allPhotos.length) {
-        allPhotos = getVisiblePhotos();
-    }
-
-    let index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
-    if (index === -1) {
-        allPhotos = getVisiblePhotos();
-        index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
-    }
-
+    allPhotos = getVisiblePhotos();
+    const index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
     if (index === -1) return;
-    showPhoto(index);
-
-    ensureAllPhotosLoaded().then(photos => {
-        if (!lightbox.classList.contains('active')) return;
-        const refreshedIndex = photos.findIndex(photo => photo.full_url === fullUrl);
-        if (refreshedIndex !== -1) {
-            currentIndex = refreshedIndex;
-        }
-    });
+    openLightbox(index);
   }
 
   gallery.addEventListener('click', function(e) {
@@ -182,24 +207,31 @@ function initLightbox() {
     }
   });
 
-  function closeLightbox() {
-    lightbox.classList.remove('active');
-    lightboxImg.src = '';
-    currentIndex = -1;
-  }
-
   function prevPhoto() {
     if (currentIndex > 0) showPhoto(currentIndex - 1);
   }
 
-  function nextPhoto() {
-    if (currentIndex < allPhotos.length - 1) showPhoto(currentIndex + 1);
+  async function nextPhoto() {
+    if (currentIndex < allPhotos.length - 1) {
+      showPhoto(currentIndex + 1);
+      return;
+    }
+    // Достигнут конец загруженного — просим ленту догрузить страницу.
+    if (feed && feed.hasMore()) {
+      const appended = await feed.loadMore();
+      if (!lightbox.classList.contains('active')) return;
+      if (appended) {
+        allPhotos = getVisiblePhotos();
+        if (currentIndex < allPhotos.length - 1) {
+          showPhoto(currentIndex + 1);
+        } else {
+          updateCounter();
+        }
+      }
+    }
   }
 
-  // Кнопки навигации
-  const prevBtn = lightbox.querySelector('.lightbox-prev');
-  const nextBtn = lightbox.querySelector('.lightbox-next');
-
+  closeBtn && closeBtn.addEventListener('click', e => { e.stopPropagation(); closeLightbox(); });
   prevBtn && prevBtn.addEventListener('click', e => { e.stopPropagation(); prevPhoto(); });
   nextBtn && nextBtn.addEventListener('click', e => { e.stopPropagation(); nextPhoto(); });
 
@@ -216,8 +248,25 @@ function initLightbox() {
     if (e.key === 'Escape') closeLightbox();
   });
 
+  // Focus trap: Tab не покидает модальный диалог
+  lightbox.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const focusable = Array.from(lightbox.querySelectorAll('button'))
+      .filter(el => el.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  });
+
   // Свайпы на мобильных
-  setupSwipe(lightbox, prevPhoto, nextPhoto);
+  setupSwipe(lightbox, prevPhoto, nextPhoto, closeLightbox);
 
   // Клики по картинке на мобильных
   lightboxImg.addEventListener('click', function(e) {
@@ -235,15 +284,17 @@ function initLightbox() {
 function setupInfiniteScroll(gallery, cardRevealer) {
   const sentinel = document.getElementById('gallery-sentinel');
   const status = document.getElementById('gallery-feed-status');
-  if (!sentinel) return;
+  if (!sentinel) {
+    return { loadMore: () => Promise.resolve(false), hasMore: () => false };
+  }
 
-  let loading = false;
+  let inflight = null;
   let nextPage = parsePositiveInt(sentinel.dataset.currentPage, 1) + 1;
   let hasMore = sentinel.dataset.hasNext === 'true';
   let retryBlockedUntil = 0;
 
   const maybeLoadMore = () => {
-    if (!hasMore || loading) return;
+    if (!hasMore || inflight) return;
     const rect = sentinel.getBoundingClientRect();
     if (rect.top <= window.innerHeight + 500) {
       loadMore();
@@ -257,11 +308,19 @@ function setupInfiniteScroll(gallery, cardRevealer) {
     status.hidden = state === 'idle' || message === '';
   };
 
-  async function loadMore() {
-    if (loading || !hasMore) return;
-    if (Date.now() < retryBlockedUntil) return;
+  // Возвращает промис с true, если новые карточки добавлены —
+  // этим же методом пользуется лайтбокс при достижении конца списка.
+  function loadMore() {
+    if (inflight) return inflight;
+    if (!hasMore || Date.now() < retryBlockedUntil) return Promise.resolve(false);
 
-    loading = true;
+    inflight = fetchNextPage().finally(() => {
+      inflight = null;
+    });
+    return inflight;
+  }
+
+  async function fetchNextPage() {
     setFeedStatus('loading', 'Загружаем еще фото...');
 
     try {
@@ -277,6 +336,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
       const data = await response.json();
 
       const photos = Array.isArray(data.photos) ? data.photos : [];
+      let appended = 0;
       if (photos.length) {
         const fragment = document.createDocumentFragment();
         const newCards = [];
@@ -291,6 +351,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
         if (newCards.length) {
           gallery.appendChild(fragment);
           newCards.forEach(card => cardRevealer.observe(card));
+          appended = newCards.length;
         }
       }
 
@@ -304,12 +365,12 @@ function setupInfiniteScroll(gallery, cardRevealer) {
       if (hasMore) {
         requestAnimationFrame(maybeLoadMore);
       }
+      return appended > 0;
     } catch (err) {
       retryBlockedUntil = Date.now() + 2000;
       setFeedStatus('error', 'Не удалось загрузить еще фото. Прокрутите страницу еще раз.');
       console.error('Ошибка загрузки:', err);
-    } finally {
-      loading = false;
+      return false;
     }
   }
 
@@ -329,6 +390,8 @@ function setupInfiniteScroll(gallery, cardRevealer) {
 
   window.addEventListener('resize', maybeLoadMore, { passive: true });
   maybeLoadMore();
+
+  return { loadMore, hasMore: () => hasMore };
 }
 
 function initUploadForm() {
@@ -488,26 +551,39 @@ function preventDefaults(e) {
   e.stopPropagation();
 }
 
-function setupSwipe(lightbox, prev, next) {
+function setupSwipe(lightbox, prev, next, close) {
   let startX = null;
+  let startY = null;
 
   lightbox.addEventListener('touchstart', function(e) {
       if (window.innerWidth > 600) return;
-      if (e.touches.length === 1) startX = e.touches[0].clientX;
-  });
+      if (e.touches.length === 1) {
+          startX = e.touches[0].clientX;
+          startY = e.touches[0].clientY;
+      }
+  }, { passive: true });
 
   lightbox.addEventListener('touchend', function(e) {
       if (window.innerWidth > 600) return;
-      if (startX === null) return;
-      const endX = e.changedTouches[0].clientX;
-      const diff = endX - startX;
-
-      if (Math.abs(diff) > 50) {
-          if (diff > 0) prev();
-          else next();
-      }
+      if (startX === null || startY === null) return;
+      const dX = e.changedTouches[0].clientX - startX;
+      const dY = e.changedTouches[0].clientY - startY;
       startX = null;
-  });
+      startY = null;
+
+      // Листаем только когда горизонталь доминирует —
+      // диагональный жест больше не перелистывает случайно.
+      if (Math.abs(dX) > 50 && Math.abs(dX) > Math.abs(dY)) {
+          if (dX > 0) prev();
+          else next();
+          return;
+      }
+
+      // Свайп вниз закрывает просмотр
+      if (dY > 70 && Math.abs(dY) > Math.abs(dX) && typeof close === 'function') {
+          close();
+      }
+  }, { passive: true });
 }
 
 function showSwipeHint() {
@@ -566,37 +642,4 @@ function buildUrlWithQuery(basePath, params) {
     url.searchParams.set(key, String(value));
   });
   return url.toString();
-}
-
-async function fetchAllPhotos(basePath) {
-  const allPhotos = [];
-  let page = 1;
-  let hasNext = true;
-  const pageSize = 100;
-
-  while (hasNext) {
-    const url = buildUrlWithQuery(basePath, { page, page_size: pageSize });
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Не удалось получить фото: ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (Array.isArray(data.photos)) {
-      allPhotos.push(...data.photos.filter(photo => photo && photo.full_url && photo.url));
-    }
-
-    hasNext = Boolean(data.has_next);
-    page += 1;
-
-    if (page > 1000) {
-      console.warn('Остановлена загрузка lightbox: слишком много страниц');
-      break;
-    }
-  }
-
-  return allPhotos;
 }

@@ -15,7 +15,7 @@
   </div>
   {% endif %}
 
-  <div class="gallery" id="gallery" data-all-photos-url="{% url 'all_photos_json' %}">
+  <div class="gallery" id="gallery">
     {% include "gallery/partials/photo_cards.html" with photos=photos_page %}
   </div>
 
@@ -35,14 +35,27 @@
     data-has-next="{% if photos_page.has_next %}true{% else %}false{% endif %}"
   ></div>
 
-  <div class="lightbox" id="lightbox">
-    <button class="lightbox-prev" aria-label="Предыдущее фото">
+  <div
+    class="lightbox"
+    id="lightbox"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Просмотр фото"
+    aria-hidden="true"
+  >
+    <button class="lightbox-close" type="button" aria-label="Закрыть просмотр">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    </button>
+    <button class="lightbox-prev" type="button" aria-label="Предыдущее фото">
       <span class="material-icons">chevron_left</span>
     </button>
     <img src="" alt="Увеличенное изображение" />
-    <button class="lightbox-next" aria-label="Следующее фото">
+    <button class="lightbox-next" type="button" aria-label="Следующее фото">
       <span class="material-icons">chevron_right</span>
     </button>
+    <div class="lightbox-counter"></div>
     <div class="lightbox-hint">Тапните по краям для переключения</div>
   </div>
 {% endblock %}
