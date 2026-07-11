@@ -28,7 +28,12 @@ class GalleryTestCase(TestCase):
         cls._temp_media_root = tempfile.mkdtemp(prefix="gallery-test-media-")
         cls._settings_override = override_settings(
             MEDIA_ROOT=cls._temp_media_root,
-            STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage",
+            STORAGES={
+                "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+                "staticfiles": {
+                    "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+                },
+            },
         )
         cls._settings_override.enable()
 
