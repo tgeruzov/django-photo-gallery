@@ -684,6 +684,41 @@ html.js .card:not(.loaded) {
   break-inside: avoid;
 }
 
+.error-page {
+  margin-top: calc(var(--header-offset) + 2rem);
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.error-page .error-code {
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--accent-color);
+  line-height: 1;
+}
+
+.error-page h2 {
+  margin: 0.5rem 0 1rem;
+}
+
+.error-page .error-home-link {
+  display: inline-block;
+  margin-top: 1.5rem;
+  color: var(--accent-color);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.error-page .error-home-link:hover {
+  text-decoration: underline;
+}
+
+.error-page .error-home-link:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .no-image-placeholder {
   height: 200px;
   background: #eee;

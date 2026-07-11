@@ -343,6 +343,12 @@ class GalleryViewsTest(GalleryTestCase):
         payload = response.json()
         self.assertEqual(payload["photos"], [])
 
+    def test_404_uses_custom_template(self):
+        response = self.client.get("/no-such-page/")
+        self.assertEqual(response.status_code, 404)
+        self.assertTemplateUsed(response, "404.html")
+        self.assertContains(response, "В галерею", status_code=404)
+
     def test_healthz_reports_ok(self):
         response = self.client.get(reverse("healthz"))
         self.assertEqual(response.status_code, 200)
