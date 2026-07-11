@@ -86,7 +86,7 @@ def make_image_variant_buffer(img, size, quality, fmt):
     buffer = BytesIO()
     save_kwargs = {"format": fmt, "quality": quality}
     if fmt.upper() == "WEBP":
-        save_kwargs["method"] = 6
+        save_kwargs["method"] = 4  # баланс скорость/размер (6 — самый медленный)
     img_copy.save(buffer, **save_kwargs)
     buffer.seek(0)
     return buffer, img_copy.size
