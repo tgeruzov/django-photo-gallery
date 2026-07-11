@@ -64,7 +64,9 @@ services:
 
   worker:
     build: .
-    command: celery -A config worker --loglevel=info
+    # -B: встроенный beat для периодического backfill (достаточно,
+    # пока воркер один; при масштабировании вынести beat отдельно)
+    command: celery -A config worker --loglevel=info -B
     env_file: .env
     volumes:
       - media_data:/app/media

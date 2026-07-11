@@ -2,6 +2,7 @@ import logging
 
 from celery import shared_task
 from django.conf import settings
+from django.db.models import Q
 from django.db.utils import OperationalError
 
 from .image_utils import ImageProcessingError
@@ -22,6 +23,26 @@ logger = logging.getLogger(__name__)
 )
 def ensure_photo_derivatives_task(self, photo_id):
     return ensure_photo_derivatives_by_id(photo_id)
+
+
+@shared_task
+def backfill_missing_derivatives():
+    """Периодическая самопочинка: доделывает варианты, потерянные воркером.
+
+    Если брокер принял задачу, но воркер умер до выполнения (или ретраи
+    исчерпаны), фото остаётся без вариантов. Beat-расписание добирает такие
+    записи пачками.
+    """
+    from .models import Photo
+
+    photo_ids = list(
+        Photo.objects.filter(Q(optimized_image="") | Q(thumbnail=""))
+        .exclude(image="", optimized_image="")
+        .values_list("id", flat=True)[:100]
+    )
+    for photo_id in photo_ids:
+        ensure_photo_derivatives_task.delay(photo_id)
+    return len(photo_ids)
 
 
 def schedule_photo_derivatives(photo_id):

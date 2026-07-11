@@ -139,6 +139,12 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BEAT_SCHEDULE = {
+    "backfill-missing-derivatives": {
+        "task": "gallery.tasks.backfill_missing_derivatives",
+        "schedule": 900,  # каждые 15 минут
+    },
+}
 
 LOGGING = {
     "version": 1,
