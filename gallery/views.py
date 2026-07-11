@@ -11,14 +11,13 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 
-from .constants import AJAX_HEADER, AJAX_VALUE
+from .constants import AJAX_VALUE
 from .forms import PhotoUploadForm
 from .image_utils import ImageProcessingError
 from .models import Photo
 from .seo import (
     build_gallery_structured_data,
     build_seo_context,
-    get_photo_label,
     get_primary_photo_url,
 )
 from .services import DuplicatePhotoError, save_uploaded_photo
@@ -28,10 +27,7 @@ NOINDEX_ROBOTS = "noindex, nofollow, noarchive"
 
 
 def is_ajax(request):
-    return (
-        request.META.get(AJAX_HEADER) == AJAX_VALUE
-        or request.headers.get("X-Requested-With") == AJAX_VALUE
-    )
+    return request.headers.get("X-Requested-With") == AJAX_VALUE
 
 
 def serialize_photo(photo):
@@ -57,8 +53,8 @@ def serialize_photo(photo):
         "id": photo.id,
         "url": preview_url,
         "full_url": full_url,
-        "title": photo.title or get_photo_label(photo),
-        "alt_text": get_photo_label(photo),
+        "title": photo.title or photo.display_label,
+        "alt_text": photo.display_label,
         "width": width,
         "height": height,
     }
@@ -86,6 +82,7 @@ def build_index_context(request, photos_page):
         (photo for photo in photos if get_primary_photo_url(request, photo)), None
     )
     featured_image_url = get_primary_photo_url(request, featured_photo) if featured_photo else None
+    featured_image_alt = featured_photo.display_label if featured_photo else None
 
     context = {
         "photos_page": photos_page,
@@ -107,7 +104,7 @@ def build_index_context(request, photos_page):
             title=gallery_title,
             description=gallery_description,
             image_url=featured_image_url,
-            image_alt=get_photo_label(featured_photo) if featured_photo else None,
+            image_alt=featured_image_alt,
         )
     )
     return context
@@ -276,7 +273,7 @@ def upload_photo(request):
 @require_GET
 def all_photos_json(request):
     photos = Photo.objects.all().order_by("-uploaded_at")
-    max_page_size = max(1, int(getattr(settings, "MAX_JSON_PAGE_SIZE", 200)))
+    max_page_size = max(1, getattr(settings, "MAX_JSON_PAGE_SIZE", 200))
 
     try:
         page_size = int(request.GET.get("page_size", max_page_size))

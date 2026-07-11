@@ -1,5 +1,4 @@
 # Настройки изображений
-AJAX_HEADER = "HTTP_X_REQUESTED_WITH"
 AJAX_VALUE = "XMLHttpRequest"
 ACCEPT_JSON = "application/json"
 

@@ -26,10 +26,6 @@ def build_absolute_url(request, path=None):
     return request.build_absolute_uri(path or request.path)
 
 
-def get_photo_label(photo):
-    return photo.alt_text or photo.title or (f"Фотография {photo.pk}" if photo.pk else "Фотография")
-
-
 def get_primary_photo_file(photo):
     return photo.optimized_image or photo.image or photo.thumbnail
 
@@ -97,8 +93,8 @@ def build_gallery_structured_data(request, photos, *, title, description):
         image_object = {
             "@type": "ImageObject",
             "contentUrl": image_url,
-            "name": photo.title or get_photo_label(photo),
-            "description": get_photo_label(photo),
+            "name": photo.title or photo.display_label,
+            "description": photo.display_label,
         }
 
         image_file = get_primary_photo_file(photo)
