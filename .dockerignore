@@ -8,6 +8,7 @@ venv/
 db.sqlite3
 media/
 staticfiles/
+backups/
 node_modules/
 *.log
 .pytest_cache/

@@ -18,6 +18,9 @@ __pycache__/
 # Медиа файлы (загруженные пользователями)
 media/
 
+# Дампы БД из prod-compose
+backups/
+
 # Статические файлы (собранные collectstatic)
 staticfiles/
 

@@ -1,6 +1,13 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:16-alpine
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${DB_NAME:-gallery}
       POSTGRES_USER: ${DB_USER:-gallery}
@@ -13,8 +20,30 @@ services:
       timeout: 5s
       retries: 10
 
+  db-backup:
+    image: postgres:16-alpine
+    entrypoint: /bin/sh
+    command: >-
+      -c 'while true; do
+      pg_dump -h db -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -F c
+      -f "/backups/gallery-$$(date +%Y%m%d-%H%M%S).dump"
+      && find /backups -name "*.dump" -mtime +14 -delete;
+      sleep 86400; done'
+    environment:
+      POSTGRES_DB: ${DB_NAME:-gallery}
+      POSTGRES_USER: ${DB_USER:-gallery}
+      PGPASSWORD: ${DB_PASSWORD:-gallery}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+
   redis:
     image: redis:7-alpine
+    logging: *default-logging
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
@@ -48,7 +77,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
+    logging: *default-logging
 
   nginx:
     image: nginx:1.27-alpine
@@ -59,8 +97,10 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - web
+      web:
+        condition: service_healthy
     restart: unless-stopped
+    logging: *default-logging
 
   worker:
     build: .
@@ -83,7 +123,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
+    logging: *default-logging
 
 volumes:
   postgres_data:

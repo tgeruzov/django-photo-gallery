@@ -26,5 +26,11 @@ SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 2592000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+# Healthcheck-и ходят на http://127.0.0.1:8000/healthz изнутри контейнера:
+# не редиректить их на https и пропускать локальный Host.
+SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+for _host in ("localhost", "127.0.0.1"):
+    if _host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
 ENABLE_BACKGROUND_TASKS = env_bool("ENABLE_BACKGROUND_TASKS", True)

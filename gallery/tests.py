@@ -343,6 +343,11 @@ class GalleryViewsTest(GalleryTestCase):
         payload = response.json()
         self.assertEqual(payload["photos"], [])
 
+    def test_healthz_reports_ok(self):
+        response = self.client.get(reverse("healthz"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+
     def test_robots_txt_advertises_sitemap_and_blocks_internal_routes(self):
         response = self.client.get(reverse("robots_txt"))
         content = response.content.decode()

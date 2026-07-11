@@ -4,6 +4,8 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db import connections
+from django.db.utils import OperationalError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -321,6 +323,16 @@ def all_photos_json(request):
         ),
         NOINDEX_ROBOTS,
     )
+
+
+@require_GET
+def healthz(request):
+    """Проверка живости для контейнерных healthcheck-ов: приложение + БД."""
+    try:
+        connections["default"].cursor()
+    except OperationalError:
+        return with_x_robots_tag(JsonResponse({"status": "error"}, status=503), NOINDEX_ROBOTS)
+    return with_x_robots_tag(JsonResponse({"status": "ok"}), NOINDEX_ROBOTS)
 
 
 @require_GET
