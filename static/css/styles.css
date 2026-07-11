@@ -530,8 +530,23 @@ html.js .card:not(.loaded) {
   font-family: "Funnel Sans", system-ui, sans-serif;
 }
 
+/* Скрыт визуально, но остаётся в tab-порядке (WCAG 2.1.1):
+   display:none выкидывал input из фокуса — выбор файлов без мыши
+   был невозможен. */
 .file-upload-wrapper input[type="file"] {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+}
+
+.file-upload-wrapper:focus-within .file-upload-label {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .form-actions {
