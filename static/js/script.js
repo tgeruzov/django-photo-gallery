@@ -17,25 +17,21 @@ function setupThemeSwitcher() {
   const themeBtn = document.querySelector('.theme-toggle');
   if (!themeBtn) return;
 
+  // Начальная тема применяется инлайн-скриптом в <head> (класс на <html>),
+  // чтобы light-пользователь не видел вспышку тёмной темы.
+  const root = document.documentElement;
+
   const syncThemeButtonState = () => {
-      const isLight = document.body.classList.contains('light');
+      const isLight = root.classList.contains('light');
       themeBtn.setAttribute('aria-pressed', String(isLight));
       themeBtn.setAttribute('aria-label', isLight ? 'Переключить на темную тему' : 'Переключить на светлую тему');
   };
 
-  const savedTheme = localStorage.getItem('darkMode');
-  if (savedTheme === null) {
-      if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-          document.body.classList.add('light');
-      }
-  } else if (savedTheme === 'false') {
-      document.body.classList.add('light');
-  }
   syncThemeButtonState();
 
   themeBtn.addEventListener('click', () => {
-      document.body.classList.toggle('light');
-      const isLight = document.body.classList.contains('light');
+      root.classList.toggle('light');
+      const isLight = root.classList.contains('light');
       localStorage.setItem('darkMode', !isLight);
       syncThemeButtonState();
   });

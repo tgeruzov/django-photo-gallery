@@ -31,7 +31,7 @@
   --disabled-text: var(--disabled-text-dark);
 }
 
-body.light {
+html.light {
   --bg-color: var(--pure-white);
   --text-color: #222;
   --overlay-color: rgba(255, 255, 255, 0.7);
@@ -77,12 +77,12 @@ header {
   box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.08);
 }
 
-body:not(.light) header {
+html:not(.light) header {
   background: rgba(40, 40, 40, 0.82);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-body.light header {
+html.light header {
   background: rgba(245, 245, 245, 0.92);
   box-shadow: 0 2px 16px 0 rgba(86, 178, 218, 0.07);
   border-bottom: 1px solid rgba(180, 200, 220, 0.12);
@@ -175,7 +175,7 @@ header h1 {
   font-family: "Funnel Sans", system-ui, sans-serif;
 }
 
-body.light header h1 {
+html.light header h1 {
   color: #222; /* Тёмный текст для светлой темы */
   text-shadow: 0 2px 8px rgba(255, 255, 255, 0.18), 0 1px 0 rgba(86, 178, 218, 0.06);
 }
@@ -242,8 +242,6 @@ header p {
   margin-bottom: var(--gap);
   break-inside: avoid;
   display: block;
-  opacity: 0;
-  transform: scale(0.95);
   transition: opacity var(--transition-speed) ease-out, transform var(--transition-speed) ease-out, box-shadow var(--transition-speed);
   cursor: pointer;
   width: 100%;
@@ -251,6 +249,13 @@ header p {
   background: transparent;
   padding: 0;
   text-align: initial;
+}
+
+/* Карточки прячутся под анимацию появления только при работающем JS —
+   без него (или до его загрузки) галерея видна сразу. */
+html.js .card:not(.loaded) {
+  opacity: 0;
+  transform: scale(0.95);
 }
 
 .card.loaded {
@@ -695,7 +700,7 @@ header p {
     -webkit-backdrop-filter: blur(8px);
   }
 
-  body:not(.light) .upload-toggle {
+  html:not(.light) .upload-toggle {
     background: rgba(40, 40, 40, 0.72);
   }
 

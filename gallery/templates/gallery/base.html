@@ -41,10 +41,34 @@
     <meta property="og:image:alt" content="{{ seo_image_alt }}" />
     <meta name="twitter:image:alt" content="{{ seo_image_alt }}" />
     {% endif %}
-    <meta name="theme-color" content="#1a1a1a" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1a1a" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7f7" />
+    <script>
+      // До загрузки CSS: помечаем наличие JS (анимации карточек включаются
+      // только при нём) и применяем сохранённую тему без вспышки тёмной.
+      document.documentElement.classList.add("js");
+      (function () {
+        try {
+          var stored = localStorage.getItem("darkMode");
+          var light =
+            stored === null
+              ? window.matchMedia("(prefers-color-scheme: light)").matches
+              : stored === "false";
+          if (light) document.documentElement.classList.add("light");
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
+    <noscript>
+      <style>
+        .card {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      </style>
+    </noscript>
     <link rel="icon" href="{% static 'icon/favicon-light.ico' %}" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="{% static 'icon/favicon-dark.ico' %}" media="(prefers-color-scheme: light)" />
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
