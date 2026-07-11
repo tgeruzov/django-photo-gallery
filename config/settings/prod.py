@@ -1,4 +1,12 @@
+import os
+
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F401,F403
+
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
+if not SECRET_KEY or SECRET_KEY == "dev-key-change-in-production" or len(SECRET_KEY) < 50:
+    raise ImproperlyConfigured("SECRET_KEY must be set to a strong unique value in production.")
 
 DEBUG = env_bool("DEBUG", False)
 
