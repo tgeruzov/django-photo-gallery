@@ -19,7 +19,7 @@ from .seo import (
     get_photo_label,
     get_primary_photo_url,
 )
-from .services import save_uploaded_photo
+from .services import DuplicatePhotoError, save_uploaded_photo
 
 logger = logging.getLogger(__name__)
 NOINDEX_ROBOTS = "noindex, nofollow, noarchive"
@@ -200,11 +200,15 @@ def upload_photo(request):
         files = form.cleaned_data.get("files", [])
         uploaded_count = 0
         errors = []
+        duplicates = []
 
         for file in files:
             try:
                 save_uploaded_photo(file)
                 uploaded_count += 1
+            except DuplicatePhotoError as exc:
+                logger.info("Пропущен дубликат %s: %s", file.name, exc)
+                duplicates.append(f"{file.name}: {exc}")
             except ImageProcessingError as exc:
                 logger.warning("Ошибка обработки %s: %s", file.name, exc)
                 errors.append(f"{file.name}: {exc}")
@@ -212,7 +216,7 @@ def upload_photo(request):
                 logger.exception("Непредвиденная ошибка обработки %s: %s", file.name, exc)
                 errors.append(f"{file.name}: внутренняя ошибка обработки")
 
-        if uploaded_count == 0:
+        if uploaded_count == 0 and errors:
             if is_ajax(request):
                 return with_x_robots_tag(
                     JsonResponse(
@@ -220,6 +224,7 @@ def upload_photo(request):
                             "success": False,
                             "error": "Не удалось загрузить ни одного файла",
                             "errors": errors,
+                            "duplicates": duplicates,
                         },
                         status=400,
                     ),
@@ -228,9 +233,14 @@ def upload_photo(request):
             messages.error(request, "Не удалось загрузить ни одного фото.")
             for error in errors:
                 messages.error(request, error)
-            return render_upload_page(request, PhotoUploadForm(), status=400)
+            return render_upload_page(request, form, status=400)
 
-        msg = f"Загружено {uploaded_count} фото"
+        if uploaded_count:
+            msg = f"Загружено {uploaded_count} фото"
+        else:
+            msg = "Новых фото нет"
+        if duplicates:
+            msg += f" (пропущено дубликатов: {len(duplicates)})"
         if errors:
             msg += f" (с ошибками: {len(errors)})"
 
@@ -242,6 +252,7 @@ def upload_photo(request):
                         "redirect_url": reverse("index"),
                         "message": msg,
                         "errors": errors,
+                        "duplicates": duplicates,
                     }
                 ),
                 NOINDEX_ROBOTS,
@@ -253,6 +264,8 @@ def upload_photo(request):
                 messages.warning(request, error)
         else:
             messages.success(request, msg)
+        for duplicate in duplicates:
+            messages.info(request, duplicate)
         return redirect(reverse("index"))
 
     return render_upload_page(request, form)

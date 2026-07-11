@@ -20,6 +20,16 @@ class Photo(models.Model):
     optimized_height = models.PositiveIntegerField(null=True, blank=True, editable=False)
     thumbnail_width = models.PositiveIntegerField(null=True, blank=True, editable=False)
     thumbnail_height = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    # SHA-256 оригинала для мягкой дедупликации повторных загрузок.
+    # null (а не "") — чтобы unique не конфликтовал на строках без хеша.
+    content_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+        verbose_name="SHA-256 оригинала",
+    )
     alt_text = models.CharField(
         max_length=255, blank=True, verbose_name="Альтернативный текст (для SEO и доступности)"
     )

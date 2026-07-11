@@ -11,7 +11,11 @@ from django.urls import reverse
 from PIL import Image
 
 from .models import Photo
-from .services import ensure_photo_derivatives_by_id, save_uploaded_photo
+from .services import (
+    DuplicatePhotoError,
+    ensure_photo_derivatives_by_id,
+    save_uploaded_photo,
+)
 from .tasks import schedule_photo_derivatives
 
 
@@ -69,6 +73,15 @@ class PhotoServicesTest(GalleryTestCase):
         photo.refresh_from_db()
         self.assertEqual((photo.thumbnail_width, photo.thumbnail_height), (64, 48))
         self.assertEqual((photo.optimized_width, photo.optimized_height), (64, 48))
+
+    def test_save_uploaded_photo_rejects_duplicate_content(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            save_uploaded_photo(build_test_image(filename="dup.png"))
+
+        with self.assertRaises(DuplicatePhotoError):
+            save_uploaded_photo(build_test_image(filename="dup-renamed.png"))
+
+        self.assertEqual(Photo.objects.count(), 1)
 
     def test_save_uploaded_photo_cleans_up_files_when_database_save_fails(self):
         before_files = {
@@ -229,6 +242,28 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertTrue(bool(photo.image))
         self.assertTrue(bool(photo.optimized_image))
         self.assertTrue(bool(photo.thumbnail))
+
+    def test_staff_ajax_upload_skips_duplicates_idempotently(self):
+        self.client.login(username="admin", password="pass")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("upload_photo"),
+                {"files": [build_test_image(filename="first.png")]},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("upload_photo"),
+                {"files": [build_test_image(filename="retry.png")]},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(len(payload["duplicates"]), 1)
+        self.assertEqual(Photo.objects.count(), 1)
 
     def test_staff_ajax_upload_rejects_invalid_file(self):
         self.client.login(username="admin", password="pass")

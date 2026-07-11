@@ -1,8 +1,9 @@
+import hashlib
 import logging
 import os
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from .image_utils import (
     build_optimized_content,
@@ -12,6 +13,18 @@ from .image_utils import (
 from .models import Photo
 
 logger = logging.getLogger(__name__)
+
+
+class DuplicatePhotoError(Exception):
+    """Файл с таким содержимым уже загружен в галерею."""
+
+
+def compute_upload_hash(uploaded_file):
+    hasher = hashlib.sha256()
+    for chunk in uploaded_file.chunks():
+        hasher.update(chunk)
+    uploaded_file.seek(0)
+    return hasher.hexdigest()
 
 
 def cleanup_saved_photo_files(photo):
@@ -37,11 +50,19 @@ def save_uploaded_photo(uploaded_file):
     uploaded_file.seek(0)
     original_name = os.path.basename(uploaded_file.name)
 
-    photo = Photo()
+    content_hash = compute_upload_hash(uploaded_file)
+    if Photo.objects.filter(content_hash=content_hash).exists():
+        raise DuplicatePhotoError("такое фото уже загружено")
+
+    photo = Photo(content_hash=content_hash)
     try:
         with transaction.atomic():
             photo.image.save(original_name, uploaded_file, save=False)
             photo.save()
+    except IntegrityError as exc:
+        # Гонка двух одинаковых загрузок: unique-констрейнт поймал вторую.
+        cleanup_saved_photo_files(photo)
+        raise DuplicatePhotoError("такое фото уже загружено") from exc
     except Exception:
         cleanup_saved_photo_files(photo)
         raise
