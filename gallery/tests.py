@@ -175,7 +175,7 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertIn("/static/icon/favicon-dark.ico", response["Location"])
 
     def test_index_page_loads(self):
-        response = self.client.get(reverse("index"))
+        response = self.client.get(reverse("gallery:index"))
         self.assertEqual(response.status_code, 200)
 
     def test_index_page_includes_seo_metadata_and_structured_data(self):
@@ -185,7 +185,7 @@ class GalleryViewsTest(GalleryTestCase):
             alt_text="Вечерняя панорама города",
         )
 
-        response = self.client.get(reverse("index"))
+        response = self.client.get(reverse("gallery:index"))
         content = response.content.decode()
 
         self.assertIn('<link rel="canonical" href="http://testserver/" />', content)
@@ -200,7 +200,7 @@ class GalleryViewsTest(GalleryTestCase):
         photo = Photo.objects.create(image=build_test_image(filename="orphan.png"))
         Photo.objects.filter(pk=photo.pk).update(thumbnail="thumbnails/gone/missing.webp")
 
-        response = self.client.get(reverse("index"))
+        response = self.client.get(reverse("gallery:index"))
 
         self.assertEqual(response.status_code, 200)
 
@@ -210,18 +210,18 @@ class GalleryViewsTest(GalleryTestCase):
             title="</script><script>alert(1)</script>",
         )
 
-        response = self.client.get(reverse("index"))
+        response = self.client.get(reverse("gallery:index"))
 
         self.assertNotContains(response, "</script><script>alert(1)</script>")
         self.assertContains(response, "<\\/script><script>alert(1)<\\/script>")
 
     def test_upload_requires_login(self):
-        response = self.client.get(reverse("upload_photo"))
+        response = self.client.get(reverse("gallery:upload_photo"))
         self.assertEqual(response.status_code, 302)
 
     def test_staff_can_upload(self):
         self.client.login(username="admin", password="pass")
-        response = self.client.get(reverse("upload_photo"))
+        response = self.client.get(reverse("gallery:upload_photo"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
         self.assertContains(response, 'content="noindex, nofollow, noarchive"')
@@ -230,7 +230,7 @@ class GalleryViewsTest(GalleryTestCase):
         self.client.login(username="admin", password="pass")
         with self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(
-                reverse("upload_photo"),
+                reverse("gallery:upload_photo"),
                 {"files": [build_test_image(filename="valid.png")]},
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
             )
@@ -247,14 +247,14 @@ class GalleryViewsTest(GalleryTestCase):
         self.client.login(username="admin", password="pass")
         with self.captureOnCommitCallbacks(execute=True):
             self.client.post(
-                reverse("upload_photo"),
+                reverse("gallery:upload_photo"),
                 {"files": [build_test_image(filename="first.png")]},
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
             )
 
         with self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(
-                reverse("upload_photo"),
+                reverse("gallery:upload_photo"),
                 {"files": [build_test_image(filename="retry.png")]},
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
             )
@@ -269,7 +269,7 @@ class GalleryViewsTest(GalleryTestCase):
         self.client.login(username="admin", password="pass")
         bad_file = SimpleUploadedFile("fake.jpg", b"not-an-image", content_type="image/jpeg")
         response = self.client.post(
-            reverse("upload_photo"),
+            reverse("gallery:upload_photo"),
             {"files": [bad_file]},
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
@@ -282,7 +282,7 @@ class GalleryViewsTest(GalleryTestCase):
     def test_staff_ajax_upload_rejects_empty_submission(self):
         self.client.login(username="admin", password="pass")
         response = self.client.post(
-            reverse("upload_photo"), {}, HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+            reverse("gallery:upload_photo"), {}, HTTP_X_REQUESTED_WITH="XMLHttpRequest"
         )
         self.assertEqual(response.status_code, 400)
         payload = response.json()
@@ -291,7 +291,7 @@ class GalleryViewsTest(GalleryTestCase):
 
     def test_index_ajax_out_of_range_returns_empty(self):
         response = self.client.get(
-            reverse("index") + "?page=999", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+            reverse("gallery:index") + "?page=999", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
@@ -303,7 +303,7 @@ class GalleryViewsTest(GalleryTestCase):
         Photo.objects.bulk_create(
             [Photo(image=f"photos/p{i}.jpg", title=f"p{i}") for i in range(25)]
         )
-        response = self.client.get(reverse("all_photos_json") + "?page=1&page_size=10")
+        response = self.client.get(reverse("gallery:all_photos_json") + "?page=1&page_size=10")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(len(payload["photos"]), 10)
@@ -314,7 +314,7 @@ class GalleryViewsTest(GalleryTestCase):
 
     def test_all_photos_json_includes_dimensions_for_real_images(self):
         Photo.objects.create(image=build_test_image(filename="dimensions.png"))
-        response = self.client.get(reverse("all_photos_json"))
+        response = self.client.get(reverse("gallery:all_photos_json"))
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(len(payload["photos"]), 1)
@@ -328,7 +328,7 @@ class GalleryViewsTest(GalleryTestCase):
             alt_text="Ночной городской skyline",
         )
 
-        response = self.client.get(reverse("all_photos_json"))
+        response = self.client.get(reverse("gallery:all_photos_json"))
         self.assertEqual(response.status_code, 200)
         payload = response.json()
 
@@ -338,7 +338,7 @@ class GalleryViewsTest(GalleryTestCase):
     def test_all_photos_json_skips_broken_records(self):
         photo = Photo.objects.create(image=build_test_image(filename="broken.png"))
         Photo.objects.filter(pk=photo.pk).update(image="")
-        response = self.client.get(reverse("all_photos_json"))
+        response = self.client.get(reverse("gallery:all_photos_json"))
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["photos"], [])

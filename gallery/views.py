@@ -122,7 +122,7 @@ def build_upload_context(request, form):
             title="Загрузка фотографий",
             description="Служебная закрытая страница для управления публикацией фотографий.",
             robots=NOINDEX_ROBOTS,
-            canonical_path=reverse("upload_photo"),
+            canonical_path=reverse("gallery:upload_photo"),
         )
     )
     return context
@@ -248,7 +248,7 @@ def upload_photo(request):
                 JsonResponse(
                     {
                         "success": True,
-                        "redirect_url": reverse("index"),
+                        "redirect_url": reverse("gallery:index"),
                         "message": msg,
                         "errors": errors,
                         "duplicates": duplicates,
@@ -265,7 +265,7 @@ def upload_photo(request):
             messages.success(request, msg)
         for duplicate in duplicates:
             messages.info(request, duplicate)
-        return redirect(reverse("index"))
+        return redirect(reverse("gallery:index"))
 
     return render_upload_page(request, form)
 
