@@ -6,7 +6,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import connections
 from django.db.utils import OperationalError
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET
@@ -150,7 +150,9 @@ def index(request):
                 JsonResponse({"photos": [], "has_next": False}),
                 NOINDEX_ROBOTS,
             )
-        photos_page = paginator.page(paginator.num_pages)
+        # B14: молчаливая отдача последней страницы плодила бесконечные
+        # URL-дубликаты со статусом 200 для краулеров.
+        raise Http404("Страница вне диапазона")
 
     if is_ajax(request):
         photos_data = []

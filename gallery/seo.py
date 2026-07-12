@@ -23,7 +23,11 @@ def get_site_locale():
 
 
 def build_absolute_url(request, path=None):
-    return request.build_absolute_uri(path or request.path)
+    # Без path сохраняем query string (?page=N): страницы пагинации
+    # объявляют self-canonical, а не копию главной (SE1).
+    if path:
+        return request.build_absolute_uri(path)
+    return request.build_absolute_uri()
 
 
 def get_primary_photo_file(photo):

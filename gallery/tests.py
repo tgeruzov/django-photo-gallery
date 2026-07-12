@@ -326,6 +326,20 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertFalse(payload["success"])
         self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
 
+    def test_index_out_of_range_page_returns_404(self):
+        response = self.client.get(reverse("gallery:index") + "?page=999")
+        self.assertEqual(response.status_code, 404)
+
+    def test_paginated_page_declares_self_canonical(self):
+        Photo.objects.bulk_create(
+            [Photo(image=f"photos/c{i}.jpg", title=f"c{i}") for i in range(13)]
+        )
+
+        response = self.client.get(reverse("gallery:index") + "?page=2")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'rel="canonical" href="http://testserver/?page=2"')
+
     def test_index_ajax_out_of_range_returns_empty(self):
         response = self.client.get(
             reverse("gallery:index") + "?page=999", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
