@@ -113,6 +113,11 @@ STORAGES = {
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Безопасный дефолт без внешних сервисов; prod переопределяет на Redis
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+}
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SITE_NAME = os.environ.get("SITE_NAME", "Timur Geruzov")
 SITE_LOCALE = os.environ.get("SITE_LOCALE", "ru_RU")

@@ -9,6 +9,7 @@ from django.db.utils import OperationalError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_GET
 
 from .constants import AJAX_VALUE
@@ -273,6 +274,7 @@ def upload_photo(request):
 
 
 @require_GET
+@cache_page(60)
 def all_photos_json(request):
     photos = Photo.objects.all().order_by("-uploaded_at")
     max_page_size = max(1, getattr(settings, "MAX_JSON_PAGE_SIZE", 200))
@@ -335,6 +337,7 @@ def healthz(request):
 
 
 @require_GET
+@cache_page(60)
 def robots_txt(request):
     lines = [
         "User-agent: *",
