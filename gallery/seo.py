@@ -4,6 +4,9 @@ import mimetypes
 
 from django.conf import settings
 
+# Python < 3.13 не знает webp из коробки
+mimetypes.add_type("image/webp", ".webp")
+
 
 def get_site_name():
     return getattr(settings, "SITE_NAME", "Timur Geruzov")
