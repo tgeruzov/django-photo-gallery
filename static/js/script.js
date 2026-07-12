@@ -204,7 +204,7 @@ function initLightbox(gallery, feed) {
     }
     lastFocused = null;
     lightbox.setAttribute('aria-hidden', 'true');
-    lightboxImg.src = '';
+    lightboxImg.removeAttribute('src');
     currentIndex = -1;
     updateCounter();
   }

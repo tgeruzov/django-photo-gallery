@@ -240,7 +240,7 @@ def upload_photo(request):
                     ),
                     NOINDEX_ROBOTS,
                 )
-            messages.error(request, "Исправьте ошибки формы и попробуйте снова.")
+            # H9: без дублирующего message — детали уже выводит form.errors
             return render_upload_page(request, form, status=400)
 
         files = form.cleaned_data.get("files", [])
