@@ -401,7 +401,6 @@ html.js .card:not(.loaded) {
   border-radius: 50%;
   width: 48px;
   height: 48px;
-  font-size: 2.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -410,14 +409,6 @@ html.js .card:not(.loaded) {
   box-shadow: 0 2px 8px rgba(40, 40, 40, 0.15);
   transition: transform 0.2s ease, background 0.2s ease;
   opacity: 0.92;
-  font-family: "Material Icons", "Funnel Sans", system-ui, sans-serif;
-  font-style: normal;
-  font-weight: normal;
-  letter-spacing: normal;
-  text-transform: none;
-  direction: ltr;
-  -webkit-font-feature-settings: "liga";
-  font-feature-settings: "liga";
 }
 
 .lightbox-prev:hover,
@@ -451,11 +442,30 @@ html.js .card:not(.loaded) {
   position: fixed;
   top: 2rem;
   right: 1rem;
+  /* C8: touch-target не меньше 44px */
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   cursor: pointer;
   z-index: 1000;
   transition: transform 0.1s ease;
+}
+
+/* UX17: солнце в тёмной теме (клик даст светлую), луна — в светлой */
+.theme-icon-moon {
+  display: none;
+}
+
+html.light .theme-icon-sun {
+  display: none;
+}
+
+html.light .theme-icon-moon {
+  display: block;
 }
 
 .theme-toggle:hover {
@@ -869,31 +879,35 @@ html.js .card:not(.loaded) {
     --header-offset: 170px;
   }
 
-  .upload-toggle {
+  .upload-toggle,
+  .theme-toggle {
     top: 0.75rem;
     transform: none;
     position: fixed;
     z-index: 1100;
     display: flex;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 999px;
     background: rgba(245, 245, 245, 0.88);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
 
-  html:not(.light) .upload-toggle {
+  html:not(.light) .upload-toggle,
+  html:not(.light) .theme-toggle {
     background: rgba(40, 40, 40, 0.72);
   }
 
+  /* U3: переключатель темы снова доступен на мобильных */
   .theme-toggle {
-    display: none;
+    left: auto;
+    right: 0.5rem;
   }
 
   .upload-toggle {
     left: auto;
-    right: 0.5rem;
+    right: 3.75rem;
   }
 
   header {

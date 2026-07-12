@@ -82,18 +82,21 @@
     </noscript>
     <link rel="icon" href="{% static 'icon/favicon-light.ico' %}" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="{% static 'icon/favicon-dark.ico' %}" media="(prefers-color-scheme: light)" />
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
     {% block extra_meta %}{% endblock %}
     {% block head_scripts %}{% endblock %}
   </head>
   <body>
-    <button class="theme-toggle" aria-label="Toggle theme">
-      <svg class="theme-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="6" fill="currentColor" />
+    <button class="theme-toggle" aria-label="Переключить тему" title="Переключить тему">
+      <svg class="theme-toggle-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+      </svg>
+      <svg class="theme-toggle-icon theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
       </svg>
     </button>
     {% if user.is_staff or user.is_superuser %}
-    <a class="upload-toggle" aria-label="Upload photo" href="{% url 'gallery:upload_photo' %}">
+    <a class="upload-toggle" aria-label="Загрузить фото" title="Загрузить фото" href="{% url 'gallery:upload_photo' %}">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 5v14M5 12h14" />
       </svg>
