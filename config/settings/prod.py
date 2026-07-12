@@ -26,11 +26,15 @@ CACHES = {
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 CSRF_COOKIE_SECURE = True
+# JS берёт CSRF-токен из скрытого поля формы — cookie ему не нужна (S10)
+CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "Strict"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 2592000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+# preload валиден только при max-age >= 1 года — включать явно через env (SE5)
+SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
 # Healthcheck-и ходят на http://127.0.0.1:8000/healthz изнутри контейнера:
 # не редиректить их на https и пропускать локальный Host.
