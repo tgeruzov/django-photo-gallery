@@ -55,7 +55,6 @@ def validate_image_type(uploaded_file):
 
 
 class PhotoUploadForm(forms.Form):
-    # TODO: добавить поддержку HEIC когда будет время
     ALLOWED_IMAGE_EXTENSIONS = DEFAULT_ALLOWED_IMAGE_EXTENSIONS
 
     files = MultipleFileField(
