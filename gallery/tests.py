@@ -127,9 +127,11 @@ class PhotoServicesTest(GalleryTestCase):
             if path.is_file()
         }
 
-        with patch.object(Photo, "save", side_effect=RuntimeError("db unavailable")):
-            with self.assertRaises(RuntimeError):
-                save_uploaded_photo(build_test_image(filename="rollback.png"))
+        with (
+            patch.object(Photo, "save", side_effect=RuntimeError("db unavailable")),
+            self.assertRaises(RuntimeError),
+        ):
+            save_uploaded_photo(build_test_image(filename="rollback.png"))
 
         after_files = {
             path.relative_to(self._temp_media_root)
@@ -195,9 +197,11 @@ class PhotoServicesTest(GalleryTestCase):
 
     @override_settings(ENABLE_BACKGROUND_TASKS=True)
     def test_signal_schedules_background_processing_on_commit(self):
-        with patch("gallery.signals.schedule_photo_derivatives") as schedule_mock:
-            with self.captureOnCommitCallbacks(execute=True):
-                photo = Photo.objects.create(image=build_test_image(filename="queued.png"))
+        with (
+            patch("gallery.signals.schedule_photo_derivatives") as schedule_mock,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            photo = Photo.objects.create(image=build_test_image(filename="queued.png"))
 
         schedule_mock.assert_called_once_with(photo.pk)
 

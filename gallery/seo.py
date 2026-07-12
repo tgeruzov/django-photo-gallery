@@ -1,3 +1,4 @@
+import contextlib
 import json
 import mimetypes
 
@@ -60,10 +61,7 @@ def build_seo_context(
 ):
     site_name = get_site_name()
     clean_title = (title or site_name).strip()
-    if clean_title == site_name:
-        seo_title = site_name
-    else:
-        seo_title = f"{clean_title} | {site_name}"
+    seo_title = site_name if clean_title == site_name else f"{clean_title} | {site_name}"
 
     return {
         "seo_title": seo_title,
@@ -123,10 +121,8 @@ def build_gallery_structured_data(request, photos, *, title, description):
             }
         )
         if photo.thumbnail:
-            try:
+            with contextlib.suppress(ValueError):
                 image_object["thumbnailUrl"] = request.build_absolute_uri(photo.thumbnail.url)
-            except ValueError:
-                pass
 
         image_objects.append(image_object)
 

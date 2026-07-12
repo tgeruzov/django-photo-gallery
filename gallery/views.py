@@ -196,7 +196,7 @@ def index(request):
             )
         # B14: молчаливая отдача последней страницы плодила бесконечные
         # URL-дубликаты со статусом 200 для краулеров.
-        raise Http404("Страница вне диапазона")
+        raise Http404("Страница вне диапазона") from None
 
     if is_ajax(request):
         photos_data = []
@@ -280,10 +280,7 @@ def upload_photo(request):
                 messages.error(request, error)
             return render_upload_page(request, form, status=400)
 
-        if uploaded_count:
-            msg = f"Загружено {uploaded_count} фото"
-        else:
-            msg = "Новых фото нет"
+        msg = f"Загружено {uploaded_count} фото" if uploaded_count else "Новых фото нет"
         if duplicates:
             msg += f" (пропущено дубликатов: {len(duplicates)})"
         if errors:
