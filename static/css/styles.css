@@ -6,6 +6,18 @@
   --radius: 8px;
   --transition-speed: 0.3s;
   --header-offset: 150px;
+  /* UX22: шкала отступов и теней + семантические цвета */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --color-danger: #c8323c;
+  --color-success: #3099c7;
+  --danger-text: #d86a75;
+  --status-text: #56b2da;
   --pure-white: #f7f7f7;
   --pure-black: #1a1a1a;
   --color-1: #f2f9fd;
@@ -27,7 +39,7 @@
   --disabled-bg-dark: var(--color-10);
   --disabled-text-dark: var(--color-4);
   --disabled-bg-light: var(--color-3);
-  --disabled-text-light: var(--accent-color);
+  --disabled-text-light: var(--color-7);
   --disabled-bg: var(--disabled-bg-dark);
   --disabled-text: var(--disabled-text-dark);
 }
@@ -40,6 +52,10 @@ html.light {
   --form-text: var(--color-11);
   --disabled-bg: var(--disabled-bg-light);
   --disabled-text: var(--disabled-text-light);
+  /* C4: на светлом фоне акцентный #56b2da даёт ~2.4:1 —
+     для текста используем тёмный оттенок палитры (~4.6:1) */
+  --status-text: var(--color-7);
+  --danger-text: var(--color-danger);
 }
 
 * {
@@ -258,10 +274,10 @@ header p {
 .gallery-feed-status {
   min-height: 1.5rem;
   max-width: 1500px;
-  margin: 0 auto 0.75rem;
-  padding: 0 1rem;
+  margin: 0 auto var(--space-3);
+  padding: 0 var(--space-4);
   text-align: center;
-  color: rgba(86, 178, 218, 0.95);
+  color: var(--status-text);
   font-size: 0.95rem;
   opacity: 0;
   transition: opacity var(--transition-speed) ease;
@@ -273,7 +289,7 @@ header p {
 }
 
 .gallery-feed-status[data-state="error"] {
-  color: #d86a75;
+  color: var(--danger-text);
 }
 
 .gallery-sentinel {
@@ -425,6 +441,39 @@ html.js .card:not(.loaded) {
   pointer-events: none;
 }
 
+/* C3: уважение prefers-reduced-motion — глушим фоновые анимации
+   и сводим переходы к мгновенным */
+@media (prefers-reduced-motion: reduce) {
+  .glow-circle {
+    animation: none;
+  }
+
+  * {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Подсказка о свайпе: видимостью управляет JS (показывается
+   один раз за сессию и только на мобильных) */
+.lightbox-hint {
+  display: none;
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  color: #fff;
+  font-size: 1rem;
+  opacity: 0.45;
+  pointer-events: none;
+  text-shadow: 0 2px 8px #000;
+  z-index: 1100;
+  transition: opacity 0.4s;
+}
+
 .lightbox-prev,
 .lightbox-next {
   position: absolute;
@@ -568,8 +617,8 @@ html.light .theme-icon-moon {
 }
 
 .alert {
-  margin-bottom: 0.75rem;
-  padding: 0.75rem 1rem;
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius);
   font-size: 0.95rem;
   background: rgba(86, 178, 218, 0.12);
@@ -577,8 +626,10 @@ html.light .theme-icon-moon {
   color: var(--text-color);
 }
 
+/* UX22: success и danger различаются фоном и цветом, а не только рамкой */
 .alert-success {
-  border-color: rgba(86, 178, 218, 0.4);
+  border-color: rgba(48, 153, 199, 0.45);
+  background: rgba(48, 153, 199, 0.16);
 }
 
 .alert-warning,
@@ -586,6 +637,7 @@ html.light .theme-icon-moon {
 .alert-danger {
   border-color: rgba(200, 50, 60, 0.4);
   background: rgba(200, 50, 60, 0.12);
+  color: var(--danger-text);
 }
 
 .form-group {
@@ -672,9 +724,10 @@ html.light .theme-icon-moon {
   margin-top: 1rem;
 }
 
-.submit-button {
-  background: var(--accent-color) !important;
-  color: white !important;
+/* C6: специфичности .form-actions достаточно — без !important */
+.form-actions .submit-button {
+  background: var(--accent-color);
+  color: white;
   width: 100%;
   border: none;
   border-radius: var(--radius);
@@ -684,19 +737,19 @@ html.light .theme-icon-moon {
   font-weight: bold;
 }
 
-.submit-button:hover:not(:disabled) {
-  background: #4ca0c7 !important;
+.form-actions .submit-button:hover:not(:disabled) {
+  background: #4ca0c7;
   box-shadow: 0 4px 12px rgba(86, 178, 218, 0.3);
 }
 
-.submit-button:active:not(:disabled) {
-  background: #3a8db0 !important;
+.form-actions .submit-button:active:not(:disabled) {
+  background: #3a8db0;
   transform: translateY(1px);
 }
 
-.submit-button:disabled {
-  background: var(--disabled-bg) !important;
-  color: var(--disabled-text) !important;
+.form-actions .submit-button:disabled {
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
   cursor: not-allowed;
   opacity: 0.8;
 }
@@ -773,7 +826,7 @@ html.light .theme-icon-moon {
   height: 120px;
   object-fit: cover;
   border-radius: calc(var(--radius) - 2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   border: 1px solid rgba(86, 178, 218, 0.2);
 }
 
@@ -964,45 +1017,10 @@ html.light .theme-icon-moon {
     margin-bottom: 1rem;
   }
 
+  /* C2: единственное правило скрытия стрелок на мобильных —
+     базовый display:flex возвращается сам без !important */
   .lightbox-prev,
   .lightbox-next {
-    display: none !important;
-  }
-
-  .lightbox-hint {
-    position: absolute;
-    bottom: 24px;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    color: #fff;
-    font-size: 1rem;
-    opacity: 0.45;
-    pointer-events: none;
-    text-shadow: 0 2px 8px #000;
-    z-index: 1100;
-    transition: opacity 0.4s;
-  }
-}
-
-@media (min-width: 601px) {
-  .lightbox-hint {
-    display: none !important;
-  }
-
-  .lightbox-prev,
-  .lightbox-next {
-    display: flex !important;
-  }
-}
-
-@media (max-width: 600px) {
-  .lightbox-prev,
-  .lightbox-next {
-    display: none !important;
-  }
-
-  .lightbox-hint {
-    display: block;
+    display: none;
   }
 }
