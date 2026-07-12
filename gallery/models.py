@@ -80,4 +80,3 @@ class Photo(models.Model):
     @property
     def display_label(self):
         return self.alt_text or self.title or (f"Фотография {self.pk}" if self.pk else "Фотография")
-
