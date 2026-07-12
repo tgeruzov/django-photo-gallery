@@ -276,6 +276,10 @@ header p {
 .gallery {
   margin-top: calc(var(--header-offset) + 2rem);
   transition: margin-top var(--transition-speed) ease;
+  /* C5 (осознанно): column-count раскладывает фото по колонкам сверху вниз,
+     поэтому визуальный порядок не совпадает с хронологией/лайтбоксом.
+     CSS Grid сохранил бы порядок, но менял бы характер masonry-раскладки —
+     оставлено как продуктовое решение. */
   column-count: 3;
   column-gap: var(--gap);
   max-width: 1500px;
