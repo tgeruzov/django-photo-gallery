@@ -20,6 +20,7 @@ from .models import Photo
 from .seo import (
     build_gallery_structured_data,
     build_seo_context,
+    get_primary_photo_file,
     get_primary_photo_url,
 )
 from .services import DuplicatePhotoError, save_uploaded_photo
@@ -86,6 +87,11 @@ def build_index_context(request, photos_page):
     )
     featured_image_url = get_primary_photo_url(request, featured_photo) if featured_photo else None
     featured_image_alt = featured_photo.display_label if featured_photo else None
+    featured_width = featured_height = None
+    if featured_photo:
+        featured_width, featured_height = featured_photo.file_dimensions(
+            get_primary_photo_file(featured_photo)
+        )
 
     context = {
         "photos_page": photos_page,
@@ -108,6 +114,8 @@ def build_index_context(request, photos_page):
             description=gallery_description,
             image_url=featured_image_url,
             image_alt=featured_image_alt,
+            image_width=featured_width,
+            image_height=featured_height,
         )
     )
     return context

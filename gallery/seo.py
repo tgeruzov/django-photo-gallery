@@ -1,4 +1,5 @@
 import json
+import mimetypes
 
 from django.conf import settings
 
@@ -53,6 +54,8 @@ def build_seo_context(
     canonical_path=None,
     image_url=None,
     image_alt=None,
+    image_width=None,
+    image_height=None,
     og_type="website",
 ):
     site_name = get_site_name()
@@ -73,6 +76,9 @@ def build_seo_context(
         "seo_twitter_card": "summary_large_image" if image_url else "summary",
         "seo_image_url": image_url,
         "seo_image_alt": image_alt,
+        "seo_image_width": image_width,
+        "seo_image_height": image_height,
+        "seo_image_type": mimetypes.guess_type(image_url)[0] if image_url else None,
     }
 
 
@@ -106,6 +112,21 @@ def build_gallery_structured_data(request, photos, *, title, description):
         if width and height:
             image_object["width"] = width
             image_object["height"] = height
+
+        # SE3: авторство и лицензирование — «паспорт» фото для Google Images
+        site_name = get_site_name()
+        image_object.update(
+            {
+                "creator": {"@type": "Person", "name": site_name},
+                "copyrightNotice": f"© {site_name}",
+                "creditText": site_name,
+            }
+        )
+        if photo.thumbnail:
+            try:
+                image_object["thumbnailUrl"] = request.build_absolute_uri(photo.thumbnail.url)
+            except ValueError:
+                pass
 
         image_objects.append(image_object)
 
