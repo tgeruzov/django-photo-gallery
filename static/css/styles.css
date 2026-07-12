@@ -18,6 +18,7 @@
   --color-success: #3099c7;
   --danger-text: #d86a75;
   --status-text: #56b2da;
+  --shimmer-color: rgba(255, 255, 255, 0.06);
   --pure-white: #f7f7f7;
   --pure-black: #1a1a1a;
   --color-1: #f2f9fd;
@@ -56,6 +57,12 @@ html.light {
      для текста используем тёмный оттенок палитры (~4.6:1) */
   --status-text: var(--color-7);
   --danger-text: var(--color-danger);
+  --shimmer-color: rgba(0, 0, 0, 0.05);
+}
+
+/* UX14: плавный переход между страницами (прогрессивно) */
+@view-transition {
+  navigation: auto;
 }
 
 * {
@@ -166,10 +173,16 @@ html.light header {
 .glow-circle {
   position: absolute;
   border-radius: 50%;
-  filter: blur(90px);
+  /* UX8/P7: 40px визуально почти неотличим от 90px, но кратно дешевле */
+  filter: blur(40px);
   opacity: 0.55;
   animation: move-glow 14s infinite alternate ease-in-out;
   mix-blend-mode: lighten;
+}
+
+/* UX8: вкладка в фоне — анимация стоит */
+html.page-hidden .glow-circle {
+  animation-play-state: paused;
 }
 
 .glow-circle:nth-child(1) {
@@ -331,10 +344,11 @@ header p {
 }
 
 .card {
+  position: relative;
   margin-bottom: var(--gap);
   break-inside: avoid;
   display: block;
-  transition: opacity var(--transition-speed) ease-out, transform var(--transition-speed) ease-out, box-shadow var(--transition-speed);
+  transition: transform var(--transition-speed) ease-out;
   cursor: pointer;
   width: 100%;
   border: 0;
@@ -343,16 +357,49 @@ header p {
   text-align: initial;
 }
 
-/* Карточки прячутся под анимацию появления только при работающем JS —
-   без него (или до его загрузки) галерея видна сразу. */
+/* UX1+UX13: при работающем JS до загрузки прячется только изображение,
+   а карточка держит место и показывает шиммер — лента не «прыгает».
+   Без JS галерея видна сразу. */
 html.js .card:not(.loaded) {
+  transform: scale(0.98);
+  background: linear-gradient(90deg, transparent, var(--shimmer-color), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: var(--radius);
+}
+
+html.js .card:not(.loaded) img {
   opacity: 0;
-  transform: scale(0.95);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .card.loaded {
-  opacity: 1;
   transform: scale(1);
+}
+
+/* UX10: hover-тень анимируется через opacity псевдоэлемента
+   (box-shadow вызывал repaint на каждом кадре) */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transition: opacity var(--transition-speed) ease;
+  pointer-events: none;
+}
+
+.card:hover::after {
+  opacity: 1;
 }
 
 .card.card-empty {
@@ -364,17 +411,15 @@ html.js .card:not(.loaded) {
   height: auto;
   display: block;
   border-radius: var(--radius);
-  transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+  transition: transform var(--transition-speed), opacity var(--transition-speed) ease-out;
 }
 
 .card:hover img {
   transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .card:active img {
   transform: scale(0.98);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .card:focus-visible {
@@ -638,13 +683,56 @@ html.light .theme-icon-moon {
 }
 
 .alert {
+  position: relative;
   margin-bottom: var(--space-3);
   padding: var(--space-3) var(--space-4);
+  padding-right: 2.5rem;
   border-radius: var(--radius);
   font-size: 0.95rem;
   background: rgba(86, 178, 218, 0.12);
   border: 1px solid rgba(86, 178, 218, 0.25);
   color: var(--text-color);
+  max-height: 240px;
+  overflow: hidden;
+  animation: alert-in 0.3s ease;
+  transition: opacity 0.4s ease, transform 0.4s ease, max-height 0.4s ease,
+    margin 0.4s ease, padding 0.4s ease, border-width 0.4s ease;
+}
+
+@keyframes alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* U4/UX15: плавное скрытие без резкого сдвига контента */
+.alert.alert-hidden {
+  opacity: 0;
+  transform: translateY(-4px);
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+}
+
+.alert-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.alert-close:focus-visible {
+  outline: 2px solid currentColor;
+  border-radius: 4px;
 }
 
 /* UX22: success и danger различаются фоном и цветом, а не только рамкой */

@@ -1,9 +1,32 @@
 document.addEventListener('DOMContentLoaded', function () {
   setupThemeSwitcher();
   initHeaderBehavior();
+  initAlerts();
   initGallery();
   initUploadForm();
 });
+
+// U4/UX15: сообщения закрываются крестиком и сами исчезают через 6 секунд
+function initAlerts() {
+  document.querySelectorAll('.alert').forEach(alert => {
+    if (alert.id === 'upload-status') return; // управляется формой загрузки
+
+    const dismiss = () => {
+      alert.classList.add('alert-hidden');
+      setTimeout(() => alert.remove(), 450);
+    };
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'alert-close';
+    close.setAttribute('aria-label', 'Закрыть уведомление');
+    close.textContent = '×';
+    close.addEventListener('click', dismiss);
+    alert.appendChild(close);
+
+    setTimeout(dismiss, 6000);
+  });
+}
 
 function initHeaderBehavior() {
   const header = document.querySelector('header');
@@ -24,6 +47,11 @@ function initHeaderBehavior() {
   };
   window.addEventListener('scroll', syncCompact, { passive: true });
   syncCompact();
+
+  // UX8: glow-анимация шапки не жжёт GPU, пока вкладка в фоне
+  document.addEventListener('visibilitychange', () => {
+    document.documentElement.classList.toggle('page-hidden', document.hidden);
+  });
 }
 
 function initGallery() {
@@ -52,10 +80,18 @@ function setupThemeSwitcher() {
   syncThemeButtonState();
 
   themeBtn.addEventListener('click', () => {
-      root.classList.toggle('light');
-      const isLight = root.classList.contains('light');
-      localStorage.setItem('darkMode', !isLight);
-      syncThemeButtonState();
+      const applyTheme = () => {
+          root.classList.toggle('light');
+          const isLight = root.classList.contains('light');
+          localStorage.setItem('darkMode', !isLight);
+          syncThemeButtonState();
+      };
+      // UX12: единый кадр перекраски вместо «волны» переходов
+      if (document.startViewTransition) {
+          document.startViewTransition(applyTheme);
+      } else {
+          applyTheme();
+      }
   });
 }
 
@@ -85,12 +121,20 @@ function initLazyLoad(container) {
     image.addEventListener('error', onDone, { once: true });
   };
 
+  const reduceMotion =
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   const observer = 'IntersectionObserver' in window
     ? new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (!entry.isIntersecting) return;
-          revealCard(entry.target);
+        // UX9: пачка карточек появляется каскадом, а не одним миганием
+        const visible = entries.filter(entry => entry.isIntersecting);
+        visible.forEach((entry, index) => {
           observer.unobserve(entry.target);
+          if (reduceMotion) {
+            revealCard(entry.target);
+          } else {
+            setTimeout(() => revealCard(entry.target), index * 40);
+          }
         });
       }, { rootMargin: '0px 0px 160px 0px', threshold: 0.01 })
     : null;
