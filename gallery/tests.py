@@ -5,12 +5,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
-
-from django.core.exceptions import ValidationError
 
 from .forms import validate_file_size, validate_image_type
 from .image_utils import (
@@ -83,9 +82,11 @@ class FormValidatorsTest(TestCase):
 
 class ImageUtilsTest(TestCase):
     def test_decompression_bomb_raises_processing_error(self):
-        with patch.object(Image, "MAX_IMAGE_PIXELS", 10):
-            with self.assertRaises(ImageProcessingError):
-                open_image_from_file(BytesIO(build_test_image().read()))
+        with (
+            patch.object(Image, "MAX_IMAGE_PIXELS", 10),
+            self.assertRaises(ImageProcessingError),
+        ):
+            open_image_from_file(BytesIO(build_test_image().read()))
 
     def test_exif_orientation_is_applied(self):
         stream = BytesIO()
