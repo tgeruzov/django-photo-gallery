@@ -12,3 +12,8 @@ backups/
 node_modules/
 *.log
 .pytest_cache/
+docs/
+.github/
+*.md
+.pre-commit-config.yaml
+deploy/

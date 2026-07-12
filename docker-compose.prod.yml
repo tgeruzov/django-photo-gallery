@@ -53,12 +53,33 @@ services:
       timeout: 5s
       retries: 10
 
-  web:
+  # Одноразовый сервис: миграции не должны запускаться конкурентно
+  # при масштабировании web на несколько реплик (D7)
+  migrate:
     build: .
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
+             python manage.py collectstatic --noinput"
+    env_file: .env
+    volumes:
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+    environment:
+      DJANGO_ENV: prod
+      DEBUG: 0
+      DB_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+
+  web:
+    build: .
+    command: >
+      sh -c "gunicorn config.wsgi:application --bind 0.0.0.0:8000
+             --workers $${GUNICORN_WORKERS:-3} --timeout 120
+             --max-requests 500 --max-requests-jitter 50 --access-logfile -"
     env_file: .env
     volumes:
       - static_data:/app/staticfiles
@@ -78,6 +99,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD-SHELL
