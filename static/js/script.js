@@ -1,8 +1,30 @@
 document.addEventListener('DOMContentLoaded', function () {
   setupThemeSwitcher();
+  initHeaderBehavior();
   initGallery();
   initUploadForm();
 });
+
+function initHeaderBehavior() {
+  const header = document.querySelector('header');
+  if (!header) return;
+
+  // C1: offset контента считается от реальной высоты шапки —
+  // длинный hero-текст больше не уводит контент под неё.
+  if ('ResizeObserver' in window) {
+    new ResizeObserver((entries) => {
+      const height = entries[0].target.offsetHeight;
+      document.documentElement.style.setProperty('--header-offset', `${height}px`);
+    }).observe(header);
+  }
+
+  // UX18: компактная шапка при скролле — фото получают больше экрана
+  const syncCompact = () => {
+    document.documentElement.classList.toggle('header-compact', window.scrollY > 60);
+  };
+  window.addEventListener('scroll', syncCompact, { passive: true });
+  syncCompact();
+}
 
 function initGallery() {
   const gallery = document.getElementById('gallery');

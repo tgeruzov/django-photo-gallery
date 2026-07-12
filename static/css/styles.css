@@ -76,6 +76,19 @@ header {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(245, 245, 245, 0.82);
   box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.08);
+  transition: padding var(--transition-speed) ease;
+}
+
+/* UX18: компактная шапка после начала скролла */
+html.header-compact header h1 {
+  font-size: 1.5rem;
+  margin-bottom: 0;
+}
+
+html.header-compact header p {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
 }
 
 html:not(.light) header {
@@ -169,11 +182,13 @@ html.light header {
 }
 
 header h1 {
-  font-size: 3rem;
+  /* C7: fluid-масштабирование вместо фиксированных брейкпоинтов */
+  font-size: clamp(2rem, 5vw + 1rem, 3rem);
   margin-bottom: 0.5rem;
   color: #f7f7f7; /* Светлый текст для тёмной темы */
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255, 255, 255, 0.08);
   font-family: "Funnel Sans", system-ui, sans-serif;
+  transition: font-size var(--transition-speed) ease;
 }
 
 html.light header h1 {
@@ -185,14 +200,18 @@ header p {
   font-size: 1.2rem;
   opacity: 0.9;
   max-width: 900px;
+  max-height: 6rem;
+  overflow: hidden;
   margin: 0 auto;
   padding: 0 1rem;
   line-height: 1.4;
   font-family: "Funnel Sans", system-ui, sans-serif;
+  transition: opacity var(--transition-speed) ease, max-height var(--transition-speed) ease;
 }
 
 .gallery {
   margin-top: calc(var(--header-offset) + 2rem);
+  transition: margin-top var(--transition-speed) ease;
   column-count: 3;
   column-gap: var(--gap);
   max-width: 1500px;
@@ -494,6 +513,7 @@ html.js .card:not(.loaded) {
 
 .upload-container {
   margin-top: calc(var(--header-offset) + 2rem);
+  transition: margin-top var(--transition-speed) ease;
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
@@ -867,7 +887,6 @@ html.js .card:not(.loaded) {
   }
 
   header h1 {
-    font-size: 2rem;
     padding: 0 1.5rem;
     word-break: break-word;
   }
