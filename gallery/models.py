@@ -74,6 +74,15 @@ class Photo(models.Model):
         return self.thumbnail or self.optimized_image or self.image
 
     @property
+    def card_sources(self):
+        """(превью, полный файл) для карточки или None, если показывать нечего."""
+        display = self.display_file
+        full = self.optimized_image or self.image
+        if display and full:
+            return (display, full)
+        return None
+
+    @property
     def display_dimensions(self):
         return self.file_dimensions(self.display_file)
 

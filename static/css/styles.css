@@ -789,12 +789,27 @@ html.js .card:not(.loaded) {
   position: relative;
 }
 
-.no-images-message-icon::before {
-  content: "🖼️";
-  font-size: 2em;
-  margin-right: 8px;
+.no-images-message-icon {
+  flex-direction: column;
+}
+
+.empty-state-cta {
   display: inline-block;
-  vertical-align: middle;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--color-6);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.empty-state-cta:hover {
+  background: var(--color-7);
+}
+
+.empty-state-cta:focus-visible {
+  outline: 2px solid var(--color-7);
+  outline-offset: 2px;
 }
 
 .gallery > .no-images-message-icon {

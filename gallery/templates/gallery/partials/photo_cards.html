@@ -1,59 +1,28 @@
-{% load static %} {% for photo in photos %}
-{% with photo_label=photo.display_label dims=photo.display_dimensions %}
-  {% if photo.thumbnail and photo.optimized_image %}
+{% for photo in photos %}
+{% with photo_label=photo.display_label sources=photo.card_sources dims=photo.display_dimensions %}
+  {% if sources %}
   <button class="card" type="button" data-id="{{ photo.id }}" aria-label="Открыть фото: {{ photo_label }}">
     <img
       loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"
       fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
-      src="{{ photo.thumbnail.url }}"
+      src="{{ sources.0.url }}"
       alt="{{ photo_label }}"
-      data-full="{{ photo.optimized_image.url }}"
-      {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
-    />
-  </button>
-  {% elif photo.thumbnail and photo.image %}
-  <button class="card" type="button" data-id="{{ photo.id }}" aria-label="Открыть фото: {{ photo_label }}">
-    <img
-      loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
-      decoding="async"
-      fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
-      src="{{ photo.thumbnail.url }}"
-      alt="{{ photo_label }}"
-      data-full="{{ photo.image.url }}"
-      {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
-    />
-  </button>
-  {% elif photo.optimized_image %}
-  <button class="card" type="button" data-id="{{ photo.id }}" aria-label="Открыть фото: {{ photo_label }}">
-    <img
-      loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
-      decoding="async"
-      fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
-      src="{{ photo.optimized_image.url }}"
-      alt="{{ photo_label }}"
-      data-full="{{ photo.optimized_image.url }}"
-      {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
-    />
-  </button>
-  {% elif photo.image %}
-  <button class="card" type="button" data-id="{{ photo.id }}" aria-label="Открыть фото: {{ photo_label }}">
-    <img
-      loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
-      decoding="async"
-      fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
-      src="{{ photo.image.url }}"
-      alt="{{ photo_label }}"
-      data-full="{{ photo.image.url }}"
+      data-full="{{ sources.1.url }}"
       {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
     />
   </button>
   {% else %}
   <div class="card card-empty">
-    <div class="no-image-placeholder">Image unavailable</div>
+    <div class="no-image-placeholder">Изображение недоступно</div>
   </div>
   {% endif %}
 {% endwith %}
 {% empty %} {% if not request.GET.page or request.GET.page == '1' %}
-<div class="no-images-message-icon">Нет загруженных изображений</div>
+<div class="no-images-message-icon">
+  <span>Нет загруженных изображений</span>
+  {% if user.is_staff %}
+  <a class="empty-state-cta" href="{% url 'gallery:upload_photo' %}">Загрузить фото</a>
+  {% endif %}
+</div>
 {% endif %} {% endfor %}
