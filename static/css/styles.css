@@ -756,7 +756,8 @@ html.light .theme-icon-moon {
 
 .preview-container {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* UX6: сетка сама подстраивается под ширину экрана */
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: var(--gap);
   margin-top: 1rem;
   padding: 1rem;

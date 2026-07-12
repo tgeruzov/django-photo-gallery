@@ -437,7 +437,14 @@ function initUploadForm() {
   let uploading = false;
   const previewCache = new Map(); // file -> Promise<dataURL> (J2: не перекодируем повторно)
   const previewNodes = new Map(); // file -> wrapper element
+  const fileLabelText = form.querySelector('.file-upload-label span');
+  const defaultLabelText = fileLabelText ? fileLabelText.textContent : '';
   submitBtn.disabled = true;
+
+  // UX7: файл, уроненный мимо зоны, не должен открываться браузером
+  ['dragover', 'drop'].forEach(ev =>
+      window.addEventListener(ev, e => e.preventDefault())
+  );
 
   fileInput.addEventListener('change', handleFileSelect);
   form.addEventListener('submit', handleFormSubmit);
@@ -489,7 +496,18 @@ function initUploadForm() {
           setUploadStatus('', '');
       }
 
-      selectedFiles = selectedFiles.concat(validFiles);
+      // J9: повторный выбор того же файла не создаёт дубликат в пакете
+      const known = new Set(
+          selectedFiles.map(f => `${f.name}|${f.size}|${f.lastModified}`)
+      );
+      const freshFiles = validFiles.filter(f => {
+          const key = `${f.name}|${f.size}|${f.lastModified}`;
+          if (known.has(key)) return false;
+          known.add(key);
+          return true;
+      });
+
+      selectedFiles = selectedFiles.concat(freshFiles);
       updateFileInput();
       renderPreviews();
   }
@@ -535,10 +553,25 @@ function initUploadForm() {
               img.src = dataUrl;
           }
 
-          wrapper.classList.add('loaded');
+          // UX11: класс на следующем кадре, чтобы переход появления проигрался
+          requestAnimationFrame(() => wrapper.classList.add('loaded'));
       }
 
+      updateFileLabel();
       submitBtn.disabled = selectedFiles.length === 0 || uploading;
+  }
+
+  // UX19: подпись зоны показывает, сколько выбрано и на какой объём
+  function updateFileLabel() {
+      if (!fileLabelText) return;
+      if (!selectedFiles.length) {
+          fileLabelText.textContent = defaultLabelText;
+          return;
+      }
+      const totalMb =
+          selectedFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
+      fileLabelText.textContent =
+          `Выбрано: ${selectedFiles.length} файл(ов) · ${totalMb.toFixed(1)} МБ`;
   }
 
   // J2: превью кодируется один раз на файл; добавление/удаление других
@@ -568,7 +601,11 @@ function initUploadForm() {
                   const ctx = canvas.getContext('2d');
                   canvas.width = 200;
                   canvas.height = 120;
-                  ctx.drawImage(img, 0, 0, 200, 120);
+                  // J4: cover-кроп вместо растягивания — портреты не плющит
+                  const scale = Math.max(200 / img.width, 120 / img.height);
+                  const width = img.width * scale;
+                  const height = img.height * scale;
+                  ctx.drawImage(img, (200 - width) / 2, (120 - height) / 2, width, height);
                   resolve(canvas.toDataURL('image/webp', 0.6));
               };
               img.src = e.target.result;
