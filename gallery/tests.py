@@ -10,7 +10,14 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
-from .image_utils import build_thumbnail_content, open_image_from_file
+from django.core.exceptions import ValidationError
+
+from .forms import validate_file_size, validate_image_type
+from .image_utils import (
+    ImageProcessingError,
+    build_thumbnail_content,
+    open_image_from_file,
+)
 from .models import Photo
 from .services import (
     DuplicatePhotoError,
@@ -47,7 +54,39 @@ class GalleryTestCase(TestCase):
         super().tearDownClass()
 
 
+class FormValidatorsTest(TestCase):
+    def test_validate_image_type_accepts_webp_signature(self):
+        webp = SimpleUploadedFile(
+            "x.webp", b"RIFF\x24\x00\x00\x00WEBPVP8 ", content_type="image/webp"
+        )
+        validate_image_type(webp)  # не должен бросить
+
+    def test_validate_image_type_accepts_png_signature(self):
+        validate_image_type(build_test_image(filename="real.png"))
+
+    def test_validate_image_type_rejects_unknown_signature(self):
+        fake = SimpleUploadedFile("fake.jpg", b"GIF89a not allowed", content_type="image/jpeg")
+        with self.assertRaises(ValidationError):
+            validate_image_type(fake)
+
+    @override_settings(MAX_UPLOAD_SIZE_MB=1)
+    def test_validate_file_size_allows_exact_limit(self):
+        exact = SimpleUploadedFile("exact.jpg", b"x" * (1024 * 1024), content_type="image/jpeg")
+        validate_file_size(exact)  # ровно на границе — проходит
+
+    @override_settings(MAX_UPLOAD_SIZE_MB=1)
+    def test_validate_file_size_rejects_over_limit(self):
+        over = SimpleUploadedFile("over.jpg", b"x" * (1024 * 1024 + 1), content_type="image/jpeg")
+        with self.assertRaises(ValidationError):
+            validate_file_size(over)
+
+
 class ImageUtilsTest(TestCase):
+    def test_decompression_bomb_raises_processing_error(self):
+        with patch.object(Image, "MAX_IMAGE_PIXELS", 10):
+            with self.assertRaises(ImageProcessingError):
+                open_image_from_file(BytesIO(build_test_image().read()))
+
     def test_exif_orientation_is_applied(self):
         stream = BytesIO()
         exif = Image.Exif()
@@ -259,6 +298,29 @@ class GalleryViewsTest(GalleryTestCase):
     def test_upload_requires_login(self):
         response = self.client.get(reverse("gallery:upload_photo"))
         self.assertEqual(response.status_code, 302)
+
+    def test_upload_post_rejected_for_non_staff(self):
+        User.objects.create_user(username="visitor", password="pass")
+        self.client.login(username="visitor", password="pass")
+
+        response = self.client.post(
+            reverse("gallery:upload_photo"),
+            {"files": [build_test_image(filename="sneaky.png")]},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Photo.objects.count(), 0)
+
+    def test_all_photos_json_clamps_garbage_page_size(self):
+        Photo.objects.create(image=build_test_image(filename="clamp.png"))
+
+        negative = self.client.get(reverse("gallery:all_photos_json") + "?page_size=-5")
+        self.assertEqual(negative.status_code, 200)
+        self.assertEqual(negative.json()["page_size"], 1)
+
+        garbage = self.client.get(reverse("gallery:all_photos_json") + "?page_size=abc")
+        self.assertEqual(garbage.status_code, 200)
+        self.assertEqual(garbage.json()["page_size"], 200)
 
     def test_staff_can_upload(self):
         self.client.login(username="admin", password="pass")
