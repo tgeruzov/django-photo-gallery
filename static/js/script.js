@@ -323,8 +323,14 @@ function setupInfiniteScroll(gallery, cardRevealer) {
   async function fetchNextPage() {
     setFeedStatus('loading', 'Загружаем еще фото...');
 
+    // Keyset-курсор от последней карточки (P8); page — фолбэк,
+    // если карточек с id нет.
+    const cards = gallery.querySelectorAll('.card[data-id]');
+    const lastId = cards.length ? cards[cards.length - 1].dataset.id : null;
+    const params = lastId ? { after: lastId } : { page: nextPage };
+
     try {
-      const response = await fetch(buildUrlWithQuery(window.location.href, { page: nextPage }), {
+      const response = await fetch(buildUrlWithQuery(window.location.href, params), {
         headers: {
           'Accept': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
@@ -355,10 +361,12 @@ function setupInfiniteScroll(gallery, cardRevealer) {
         }
       }
 
-      const apiPage = parsePositiveInt(data.page, nextPage);
       hasMore = Boolean(data.has_next);
-      nextPage = apiPage + 1;
-      sentinel.dataset.currentPage = String(apiPage);
+      if (data.page !== undefined) {
+        const apiPage = parsePositiveInt(data.page, nextPage);
+        nextPage = apiPage + 1;
+        sentinel.dataset.currentPage = String(apiPage);
+      }
       sentinel.dataset.hasNext = String(hasMore);
       setFeedStatus('idle');
 
@@ -714,6 +722,9 @@ function createGalleryCard(photo) {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'card';
+  if (photo.id !== undefined && photo.id !== null) {
+    card.dataset.id = String(photo.id);
+  }
   card.setAttribute('aria-label', `Открыть фото: ${photoLabel}`);
 
   const img = document.createElement('img');

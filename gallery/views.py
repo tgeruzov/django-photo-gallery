@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import connections
+from django.db.models import Q
 from django.db.utils import OperationalError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -25,6 +26,7 @@ from .services import DuplicatePhotoError, save_uploaded_photo
 
 logger = logging.getLogger(__name__)
 NOINDEX_ROBOTS = "noindex, nofollow, noarchive"
+FEED_PAGE_SIZE = 12
 
 
 def is_ajax(request):
@@ -136,9 +138,42 @@ def render_upload_page(request, form, *, status=200):
     return with_x_robots_tag(response, NOINDEX_ROBOTS)
 
 
+def feed_after_response(request, photos_list, after):
+    """P8: keyset-пагинация ленты по (uploaded_at, id) вместо OFFSET."""
+    try:
+        cursor = Photo.objects.only("uploaded_at").get(pk=int(after))
+    except (TypeError, ValueError, Photo.DoesNotExist):
+        return with_x_robots_tag(
+            JsonResponse({"photos": [], "has_next": False}),
+            NOINDEX_ROBOTS,
+        )
+
+    window = list(
+        photos_list.filter(
+            Q(uploaded_at__lt=cursor.uploaded_at)
+            | Q(uploaded_at=cursor.uploaded_at, id__lt=cursor.id)
+        )[: FEED_PAGE_SIZE + 1]
+    )
+    has_next = len(window) > FEED_PAGE_SIZE
+    photos_data = []
+    for photo in window[:FEED_PAGE_SIZE]:
+        serialized = serialize_photo(photo)
+        if serialized:
+            photos_data.append(serialized)
+    return with_x_robots_tag(
+        JsonResponse({"photos": photos_data, "has_next": has_next}),
+        NOINDEX_ROBOTS,
+    )
+
+
 def index(request):
-    photos_list = Photo.objects.all().order_by("-uploaded_at")
-    paginator = Paginator(photos_list, 12)
+    # Явный tie-break по id — обязателен для корректного keyset-курсора
+    photos_list = Photo.objects.all().order_by("-uploaded_at", "-id")
+
+    if is_ajax(request) and request.GET.get("after") is not None:
+        return feed_after_response(request, photos_list, request.GET.get("after"))
+
+    paginator = Paginator(photos_list, FEED_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
 
     try:

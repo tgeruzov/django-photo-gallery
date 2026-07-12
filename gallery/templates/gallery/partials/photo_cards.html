@@ -1,7 +1,7 @@
 {% load static %} {% for photo in photos %}
 {% with photo_label=photo.display_label dims=photo.display_dimensions %}
   {% if photo.thumbnail and photo.optimized_image %}
-  <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
+  <button class="card" type="button" data-id="{{ photo.id }}" aria-label="Открыть фото: {{ photo_label }}">
     <img
       loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"
@@ -13,7 +13,7 @@
     />
   </button>
   {% elif photo.thumbnail and photo.image %}
-  <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
+  <button class="card" type="button" data-id="{{ photo.id }}" aria-label="Открыть фото: {{ photo_label }}">
     <img
       loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"
@@ -25,7 +25,7 @@
     />
   </button>
   {% elif photo.optimized_image %}
-  <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
+  <button class="card" type="button" data-id="{{ photo.id }}" aria-label="Открыть фото: {{ photo_label }}">
     <img
       loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"
@@ -37,7 +37,7 @@
     />
   </button>
   {% elif photo.image %}
-  <button class="card" type="button" aria-label="Открыть фото: {{ photo_label }}">
+  <button class="card" type="button" data-id="{{ photo.id }}" aria-label="Открыть фото: {{ photo_label }}">
     <img
       loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
       decoding="async"

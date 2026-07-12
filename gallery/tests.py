@@ -350,6 +350,37 @@ class GalleryViewsTest(GalleryTestCase):
         self.assertEqual(payload["photos"], [])
         self.assertFalse(payload["has_next"])
 
+    def test_index_ajax_supports_keyset_cursor(self):
+        Photo.objects.bulk_create(
+            [Photo(image=f"photos/k{i}.jpg", title=f"k{i}") for i in range(15)]
+        )
+        first_page = self.client.get(
+            reverse("gallery:index"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        ).json()
+        self.assertEqual(len(first_page["photos"]), 12)
+        last_id = first_page["photos"][-1]["id"]
+
+        second_page = self.client.get(
+            reverse("gallery:index") + f"?after={last_id}",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        ).json()
+
+        self.assertEqual(len(second_page["photos"]), 3)
+        self.assertFalse(second_page["has_next"])
+        first_ids = {photo["id"] for photo in first_page["photos"]}
+        second_ids = {photo["id"] for photo in second_page["photos"]}
+        self.assertFalse(first_ids & second_ids)
+
+    def test_index_ajax_invalid_cursor_returns_empty(self):
+        response = self.client.get(
+            reverse("gallery:index") + "?after=not-a-number",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["photos"], [])
+        self.assertFalse(payload["has_next"])
+
     def test_all_photos_json_supports_pagination(self):
         Photo.objects.bulk_create(
             [Photo(image=f"photos/p{i}.jpg", title=f"p{i}") for i in range(25)]
