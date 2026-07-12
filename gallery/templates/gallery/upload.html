@@ -2,7 +2,12 @@
 
 {% block content %}
   <div class="upload-container">
-    <form method="post" enctype="multipart/form-data" id="upload-form">
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      id="upload-form"
+      data-max-upload-mb="{{ max_upload_size_mb }}"
+    >
       {% csrf_token %}
       <div class="form-group">
         <div class="file-upload-wrapper">

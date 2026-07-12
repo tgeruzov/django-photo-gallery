@@ -471,11 +471,22 @@ function initUploadForm() {
   }
 
   function processFiles(files) {
-      const validFiles = files.filter(f => f.size <= 100 * 1024 * 1024);
-      const oversized = files.filter(f => f.size > 100 * 1024 * 1024);
+      // S14: лимит приходит с сервера через data-атрибут, не хардкодится
+      const maxUploadMb = parseInt(form.dataset.maxUploadMb, 10) || 100;
+      const maxBytes = maxUploadMb * 1024 * 1024;
+      const validFiles = files.filter(f => f.size <= maxBytes);
+      const oversized = files.filter(f => f.size > maxBytes);
 
       if (oversized.length) {
-          alert(`Слишком большие файлы:\n${oversized.map(f => `${f.name} (${Math.round(f.size/1024/1024)}MB)`).join('\n')}`);
+          const names = oversized
+              .map(f => `${f.name} (${Math.round(f.size / 1024 / 1024)}МБ)`)
+              .join(', ');
+          setUploadStatus(
+              `Файлы больше ${maxUploadMb}МБ не добавлены: ${names}`,
+              'danger'
+          );
+      } else {
+          setUploadStatus('', '');
       }
 
       selectedFiles = selectedFiles.concat(validFiles);

@@ -9,6 +9,10 @@ from .constants import ALLOWED_IMAGE_EXTENSIONS as DEFAULT_ALLOWED_IMAGE_EXTENSI
 class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
+    def __init__(self, attrs=None):
+        # Диалог выбора файлов сразу фильтрует по допустимым форматам (H5)
+        super().__init__({"accept": "image/jpeg,image/png,image/webp", **(attrs or {})})
+
 
 class MultipleFileField(forms.FileField):
     def __init__(self, *args, **kwargs):

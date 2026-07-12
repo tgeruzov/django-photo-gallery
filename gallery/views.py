@@ -126,6 +126,7 @@ def build_upload_context(request, form):
         "form": form,
         "hero_title": "Загрузка фотографий",
         "hero_description": "Закрытая страница для пакетной публикации новых снимков в галерею.",
+        "max_upload_size_mb": getattr(settings, "MAX_UPLOAD_SIZE_MB", 100),
     }
     context.update(
         build_seo_context(
