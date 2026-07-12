@@ -327,7 +327,31 @@ function setupInfiniteScroll(gallery, cardRevealer) {
     if (!status) return;
     status.dataset.state = state;
     status.textContent = message;
+    // UX21: ошибка даёт явную кнопку повтора вместо «прокрутите ещё раз»
+    if (state === 'error') {
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'feed-retry';
+      retry.textContent = 'Повторить';
+      retry.addEventListener('click', () => {
+        retryBlockedUntil = 0;
+        loadMore();
+      });
+      status.append(' ');
+      status.appendChild(retry);
+    }
     status.hidden = state === 'idle' || message === '';
+  };
+
+  // J8: после конца ленты слушатели не должны дёргаться на каждый скролл
+  let sentinelObserver = null;
+  const detachFeedListeners = () => {
+    if (sentinelObserver) {
+      sentinelObserver.disconnect();
+      sentinelObserver = null;
+    }
+    window.removeEventListener('scroll', maybeLoadMore);
+    window.removeEventListener('resize', maybeLoadMore);
   };
 
   // Возвращает промис с true, если новые карточки добавлены —
@@ -380,6 +404,15 @@ function setupInfiniteScroll(gallery, cardRevealer) {
           gallery.appendChild(fragment);
           newCards.forEach(card => cardRevealer.observe(card));
           appended = newCards.length;
+
+          // UX20: положение в ленте отражается в URL — «назад»/перезагрузка
+          // возвращают к текущей странице, а не в самый верх
+          const loadedPages = Math.ceil(gallery.querySelectorAll('.card').length / 12);
+          if (loadedPages > 1 && 'replaceState' in history) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('page', String(loadedPages));
+            history.replaceState(history.state, '', url);
+          }
         }
       }
 
@@ -394,18 +427,20 @@ function setupInfiniteScroll(gallery, cardRevealer) {
 
       if (hasMore) {
         requestAnimationFrame(maybeLoadMore);
+      } else {
+        detachFeedListeners();
       }
       return appended > 0;
     } catch (err) {
       retryBlockedUntil = Date.now() + 2000;
-      setFeedStatus('error', 'Не удалось загрузить еще фото. Прокрутите страницу еще раз.');
+      setFeedStatus('error', 'Не удалось загрузить еще фото.');
       console.error('Ошибка загрузки:', err);
       return false;
     }
   }
 
   if ('IntersectionObserver' in window) {
-    const sentinelObserver = new IntersectionObserver((entries) => {
+    sentinelObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           loadMore();
@@ -419,7 +454,12 @@ function setupInfiniteScroll(gallery, cardRevealer) {
   }
 
   window.addEventListener('resize', maybeLoadMore, { passive: true });
-  maybeLoadMore();
+
+  if (hasMore) {
+    maybeLoadMore();
+  } else {
+    detachFeedListeners();
+  }
 
   return { loadMore, hasMore: () => hasMore };
 }
