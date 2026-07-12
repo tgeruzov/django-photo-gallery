@@ -3,6 +3,7 @@ import logging
 import os
 
 from django.conf import settings
+from django.core.files.uploadedfile import UploadedFile
 from django.db import IntegrityError, transaction
 
 from .image_utils import (
@@ -19,7 +20,8 @@ class DuplicatePhotoError(Exception):
     """Файл с таким содержимым уже загружен в галерею."""
 
 
-def compute_upload_hash(uploaded_file):
+def compute_upload_hash(uploaded_file: UploadedFile) -> str:
+    """Считает SHA-256 загружаемого файла почанково и возвращает hex-строку."""
     hasher = hashlib.sha256()
     for chunk in uploaded_file.chunks():
         hasher.update(chunk)
@@ -27,8 +29,8 @@ def compute_upload_hash(uploaded_file):
     return hasher.hexdigest()
 
 
-def cleanup_saved_photo_files(photo):
-    """Best-effort cleanup for files written before the DB transaction failed."""
+def cleanup_saved_photo_files(photo: Photo) -> None:
+    """Подчищает файлы, записанные в storage до отката транзакции БД."""
     for field_name in ("image", "optimized_image", "thumbnail"):
         file_field = getattr(photo, field_name, None)
         if not file_field:
@@ -39,8 +41,8 @@ def cleanup_saved_photo_files(photo):
             logger.warning("Failed to clean up %s for photo rollback.", field_name)
 
 
-def save_uploaded_photo(uploaded_file):
-    """Persist the original upload; derived files are generated after commit.
+def save_uploaded_photo(uploaded_file: UploadedFile) -> Photo:
+    """Сохраняет оригинал загрузки; варианты генерируются после коммита.
 
     Варианты (optimized + thumbnail) создаёт post_save-сигнал через
     schedule_photo_derivatives — в Celery-воркере или inline-фолбэком, —
@@ -70,8 +72,8 @@ def save_uploaded_photo(uploaded_file):
     return photo
 
 
-def ensure_photo_derivatives_by_id(photo_id):
-    """Backfill optimized and thumbnail files for an existing photo."""
+def ensure_photo_derivatives_by_id(photo_id: int) -> bool:
+    """Достраивает optimized и thumbnail для существующего фото по id."""
     try:
         with transaction.atomic():
             photo = Photo.objects.select_for_update().get(pk=photo_id)
@@ -81,8 +83,8 @@ def ensure_photo_derivatives_by_id(photo_id):
         return False
 
 
-def ensure_photo_derivatives(photo):
-    """Generate any missing image variants for a photo instance."""
+def ensure_photo_derivatives(photo: Photo) -> bool:
+    """Генерирует недостающие варианты изображения для экземпляра фото."""
     source_image = photo.image or photo.optimized_image
     if not source_image:
         logger.warning("Photo %s has no source image for derivative generation.", photo.pk)
