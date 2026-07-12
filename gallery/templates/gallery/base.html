@@ -86,6 +86,7 @@
     {% block head_scripts %}{% endblock %}
   </head>
   <body>
+    <a class="skip-link" href="#main">К содержимому</a>
     <button class="theme-toggle" aria-label="Переключить тему" title="Переключить тему">
       <svg class="theme-toggle-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="12" cy="12" r="4" />
@@ -110,12 +111,17 @@
         <div class="glow-circle"></div>
         <div class="glow-circle"></div>
       </div>
-      <h1>{% block hero_title %}{{ hero_title|default:"Timur Geruzov" }}{% endblock %}</h1>
+      <h1>
+        <a class="header-home-link" href="/">{% block hero_title %}{{ hero_title|default:"Timur Geruzov" }}{% endblock %}</a>
+      </h1>
       {% if hero_description %}
       <p>{% block hero_description %}{{ hero_description }}{% endblock %}</p>
       {% endif %}
     </header>
-    <main>{% block content %}{% endblock %}</main>
+    <main id="main">{% block content %}{% endblock %}</main>
+    <footer class="site-footer">
+      <p>© {% now "Y" %} {{ seo_site_name|default:"Timur Geruzov" }} — авторская фотогалерея</p>
+    </footer>
     <script src="{% static 'js/script.js' %}"></script>
     {% block scripts %}{% endblock %}
   </body>
