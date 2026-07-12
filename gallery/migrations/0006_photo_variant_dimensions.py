@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("gallery", "0005_photo_gallery_photo_up_idx"),
     ]
