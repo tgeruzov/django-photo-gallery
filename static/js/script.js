@@ -29,29 +29,35 @@ function initAlerts() {
 }
 
 function initHeaderBehavior() {
-  const header = document.querySelector('header');
-  if (!header) return;
+  const topbar = document.querySelector('.topbar');
+  const scrollTopBtn = document.querySelector('.scroll-top');
 
-  // C1: offset контента считается от реальной высоты шапки —
-  // длинный hero-текст больше не уводит контент под неё.
-  if ('ResizeObserver' in window) {
-    new ResizeObserver((entries) => {
-      const height = entries[0].target.offsetHeight;
-      document.documentElement.style.setProperty('--header-offset', `${height}px`);
-    }).observe(header);
-  }
-
-  // UX18: компактная шапка при скролле — фото получают больше экрана
-  const syncCompact = () => {
-    document.documentElement.classList.toggle('header-compact', window.scrollY > 60);
+  // Шапка sticky и живёт в потоке — разделитель появляется только
+  // после начала скролла; заодно ведём прогресс-волосок и кнопку «наверх».
+  const syncScroll = () => {
+    const y = window.scrollY;
+    if (topbar) {
+      topbar.classList.toggle('is-scrolled', y > 4);
+    }
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    document.documentElement.style.setProperty(
+      '--scroll-progress',
+      max > 0 ? String(Math.min(1, y / max)) : '0'
+    );
+    if (scrollTopBtn) {
+      scrollTopBtn.classList.toggle('visible', y > 1200);
+    }
   };
-  window.addEventListener('scroll', syncCompact, { passive: true });
-  syncCompact();
+  window.addEventListener('scroll', syncScroll, { passive: true });
+  syncScroll();
 
-  // UX8: glow-анимация шапки не жжёт GPU, пока вкладка в фоне
-  document.addEventListener('visibilitychange', () => {
-    document.documentElement.classList.toggle('page-hidden', document.hidden);
-  });
+  if (scrollTopBtn) {
+    scrollTopBtn.addEventListener('click', () => {
+      const reduceMotion =
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+    });
+  }
 }
 
 function initGallery() {
@@ -60,7 +66,50 @@ function initGallery() {
 
   const cardRevealer = initLazyLoad(gallery);
   const feed = setupInfiniteScroll(gallery, cardRevealer);
+  initCardTilt(gallery);
   initLightbox(gallery, feed);
+}
+
+// 3D-наклон карточки за курсором + позиция блика. Один делегированный
+// слушатель на галерею; углы уходят в CSS-переменные (применяет CSS).
+function initCardTilt(gallery) {
+  const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (!finePointer.matches || reduceMotion.matches) return;
+
+  const MAX_DEG = 3.2;
+
+  const resetTilt = (card) => {
+    card.style.removeProperty('--rx');
+    card.style.removeProperty('--ry');
+  };
+
+  gallery.addEventListener('pointermove', (e) => {
+    const card = e.target.closest('.card');
+    if (!card || card.classList.contains('card-empty')) return;
+    const rect = card.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    card.style.setProperty('--px', px.toFixed(3));
+    card.style.setProperty('--py', py.toFixed(3));
+    card.style.setProperty('--rx', `${((px - 0.5) * MAX_DEG).toFixed(2)}deg`);
+    card.style.setProperty('--ry', `${((0.5 - py) * MAX_DEG).toFixed(2)}deg`);
+  });
+
+  gallery.addEventListener('pointerout', (e) => {
+    const card = e.target.closest('.card');
+    if (card && !card.contains(e.relatedTarget)) {
+      resetTilt(card);
+    }
+  });
+
+  // Перед zoom-полётом в лайтбокс карточка выравнивается,
+  // чтобы FLIP мерил ровный прямоугольник
+  gallery.addEventListener('click', (e) => {
+    const card = e.target.closest('.card');
+    if (card) resetTilt(card);
+  }, true);
 }
 
 function setupThemeSwitcher() {
@@ -86,12 +135,47 @@ function setupThemeSwitcher() {
           localStorage.setItem('darkMode', !isLight);
           syncThemeButtonState();
       };
-      // UX12: единый кадр перекраски вместо «волны» переходов
-      if (document.startViewTransition) {
-          document.startViewTransition(applyTheme);
-      } else {
+
+      const reduceMotion =
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!document.startViewTransition || reduceMotion) {
           applyTheme();
+          return;
       }
+
+      // Новая тема «разливается» кругом от кнопки-переключателя.
+      // Класс theme-switching отключает дефолтный кросс-фейд только
+      // на время этого перехода (см. CSS), навигационный — не трогает.
+      const rect = themeBtn.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const radius = Math.hypot(
+          Math.max(x, window.innerWidth - x),
+          Math.max(y, window.innerHeight - y)
+      );
+
+      root.classList.add('theme-switching');
+      const transition = document.startViewTransition(applyTheme);
+      transition.ready
+          .then(() => {
+              root.animate(
+                  {
+                      clipPath: [
+                          `circle(0px at ${x}px ${y}px)`,
+                          `circle(${radius}px at ${x}px ${y}px)`,
+                      ],
+                  },
+                  {
+                      duration: 450,
+                      easing: 'ease-in-out',
+                      pseudoElement: '::view-transition-new(root)',
+                  }
+              );
+          })
+          .catch(() => {}); // переход мог быть пропущен (фоновая вкладка)
+      transition.finished.finally(() => {
+          root.classList.remove('theme-switching');
+      });
   });
 }
 
@@ -185,6 +269,7 @@ function initLightbox(gallery, feed) {
           url: img.src,
           full_url: img.getAttribute('data-full'),
           title: img.alt || '',
+          el: img, // источник/цель zoom-полёта (как в галерее iPhone)
       }))
       .filter(photo => photo.url && photo.full_url);
   }
@@ -196,6 +281,41 @@ function initLightbox(gallery, feed) {
       : '';
   }
 
+  // Ambient-свечение: средний цвет снимка (по миниатюре из кэша браузера)
+  // подсвечивает фон лайтбокса — фото «освещает комнату».
+  const glowCache = new Map(); // url -> rgba-строка
+  function applyPhotoGlow(url) {
+    if (glowCache.has(url)) {
+      lightbox.style.setProperty('--photo-glow', glowCache.get(url));
+      return;
+    }
+    const probe = new Image();
+    probe.onload = () => {
+      let glow = 'rgba(120, 140, 160, 0.4)';
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(probe, 0, 0, 16, 16);
+        const data = ctx.getImageData(0, 0, 16, 16).data;
+        let r = 0, g = 0, b = 0;
+        const count = data.length / 4;
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+        }
+        glow = `rgba(${Math.round(r / count)}, ${Math.round(g / count)}, ${Math.round(b / count)}, 0.5)`;
+      } catch (err) {
+        // canvas может быть «испачкан» кросс-доменным файлом — остаётся дефолт
+      }
+      glowCache.set(url, glow);
+      lightbox.style.setProperty('--photo-glow', glow);
+    };
+    probe.src = url;
+  }
+
   function preloadNeighbors(index) {
     [index - 1, index + 1].forEach(i => {
       if (i >= 0 && i < allPhotos.length) {
@@ -204,10 +324,20 @@ function initLightbox(gallery, feed) {
     });
   }
 
-  function showPhoto(index) {
+  function showPhoto(index, direction) {
     if (index < 0 || index >= allPhotos.length) return;
     currentIndex = index;
     const photo = allPhotos[index];
+
+    // Направленный вход нового кадра: класс перевешивается с reflow,
+    // чтобы анимация проигрывалась на каждом перелистывании.
+    lightboxImg.classList.remove('slide-from-left', 'slide-from-right');
+    if (direction) {
+      void lightboxImg.offsetWidth;
+      lightboxImg.classList.add(
+        direction === 'next' ? 'slide-from-right' : 'slide-from-left'
+      );
+    }
 
     // Blur-up: мгновенно показываем миниатюру из кэша,
     // полную версию подменяем по её загрузке.
@@ -227,30 +357,136 @@ function initLightbox(gallery, feed) {
     full.src = photo.full_url;
 
     updateCounter();
+    applyPhotoGlow(photo.url);
     preloadNeighbors(index);
     showSwipeHint();
   }
 
+  // Zoom-переходы «как в галерее iPhone»: фото вылетает из своей карточки
+  // и при закрытии сжимается точно обратно (FLIP через WAAPI).
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const canZoom = () =>
+    typeof lightboxImg.animate === 'function' && !reduceMotion.matches;
+  let closing = false;
+
+  function finishClose() {
+    if (!closing) return;
+    closing = false;
+    lightbox.setAttribute('aria-hidden', 'true');
+    lightboxImg.removeAttribute('src');
+    lightboxImg.style.opacity = '';
+    // Снимаем fill:forwards прошлого полёта, чтобы следующий показ был чистым
+    if (typeof lightboxImg.getAnimations === 'function') {
+      lightboxImg.getAnimations().forEach(animation => animation.cancel());
+    }
+    currentIndex = -1;
+    updateCounter();
+  }
+
+  function zoomFromCard(sourceEl) {
+    if (!canZoom() || !sourceEl) return;
+
+    const fly = () => {
+      const from = sourceEl.getBoundingClientRect();
+      const to = lightboxImg.getBoundingClientRect();
+      if (!from.width || !to.width) return;
+      const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+      const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+      const scale = from.width / to.width;
+
+      // На время полёта фото «поднимается» из сетки — карточка пустеет
+      sourceEl.style.visibility = 'hidden';
+      const animation = lightboxImg.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, borderRadius: `${12 / scale}px` },
+          { transform: 'none', borderRadius: '8px' },
+        ],
+        { duration: 420, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1)' }
+      );
+      settleAnimation(animation, 620, () => {
+        sourceEl.style.visibility = '';
+      });
+    };
+
+    // Миниатюра почти всегда уже в кэше (она на экране) — размер известен
+    // синхронно; иначе прячем кадр до load, чтобы не мигнул в полный размер.
+    if (lightboxImg.complete && lightboxImg.naturalWidth) {
+      fly();
+    } else {
+      lightboxImg.style.opacity = '0';
+      lightboxImg.addEventListener('load', () => {
+        lightboxImg.style.opacity = '';
+        fly();
+      }, { once: true });
+    }
+  }
+
   function openLightbox(index) {
+    if (closing) finishClose(); // предыдущее закрытие ещё летит — обрываем
     lastFocused = document.activeElement;
     lightbox.classList.add('active');
     lightbox.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
     showPhoto(index);
-    if (closeBtn) closeBtn.focus();
+    zoomFromCard(allPhotos[index] ? allPhotos[index].el : null);
+    if (closeBtn) closeBtn.focus({ preventScroll: true });
   }
 
   function closeLightbox() {
+    if (closing || !lightbox.classList.contains('active')) return;
+    closing = true;
+
+    const sourceEl =
+      currentIndex >= 0 && allPhotos[currentIndex] ? allPhotos[currentIndex].el : null;
+
+    // Скрим и кнопки гаснут сразу; фото в это время летит в карточку
     lightbox.classList.remove('active');
     document.body.style.overflow = '';
     if (lastFocused && typeof lastFocused.focus === 'function') {
-      lastFocused.focus();
+      lastFocused.focus({ preventScroll: true });
     }
     lastFocused = null;
-    lightbox.setAttribute('aria-hidden', 'true');
-    lightboxImg.removeAttribute('src');
-    currentIndex = -1;
-    updateCounter();
+
+    const hasImage = Boolean(lightboxImg.getAttribute('src'));
+
+    if (canZoom() && hasImage && sourceEl && sourceEl.isConnected) {
+      const to = sourceEl.getBoundingClientRect();
+      const from = lightboxImg.getBoundingClientRect();
+      const inViewport = to.width > 0 && to.bottom > 0 && to.top < window.innerHeight;
+      if (inViewport && from.width > 0) {
+        const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+        const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+        const scale = to.width / from.width;
+        sourceEl.style.visibility = 'hidden';
+        const animation = lightboxImg.animate(
+          [
+            { transform: 'none', borderRadius: '8px' },
+            { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, borderRadius: `${12 / scale}px` },
+          ],
+          { duration: 400, easing: 'cubic-bezier(0.3, 0.7, 0.3, 1)', fill: 'forwards' }
+        );
+        settleAnimation(animation, 600, () => {
+          sourceEl.style.visibility = '';
+          finishClose();
+        });
+        return;
+      }
+    }
+
+    if (canZoom() && hasImage) {
+      // Карточка вне экрана — мягкое сжатие с растворением
+      const animation = lightboxImg.animate(
+        [
+          { transform: 'none', opacity: 1 },
+          { transform: 'scale(0.9)', opacity: 0 },
+        ],
+        { duration: 220, easing: 'ease-in', fill: 'forwards' }
+      );
+      settleAnimation(animation, 400, finishClose);
+      return;
+    }
+
+    finishClose();
   }
 
   function openFromImage(img) {
@@ -274,12 +510,12 @@ function initLightbox(gallery, feed) {
   });
 
   function prevPhoto() {
-    if (currentIndex > 0) showPhoto(currentIndex - 1);
+    if (currentIndex > 0) showPhoto(currentIndex - 1, 'prev');
   }
 
   async function nextPhoto() {
     if (currentIndex < allPhotos.length - 1) {
-      showPhoto(currentIndex + 1);
+      showPhoto(currentIndex + 1, 'next');
       return;
     }
     // Достигнут конец загруженного — просим ленту догрузить страницу.
@@ -289,7 +525,7 @@ function initLightbox(gallery, feed) {
       if (appended) {
         allPhotos = getVisiblePhotos();
         if (currentIndex < allPhotos.length - 1) {
-          showPhoto(currentIndex + 1);
+          showPhoto(currentIndex + 1, 'next');
         } else {
           updateCounter();
         }
@@ -331,20 +567,9 @@ function initLightbox(gallery, feed) {
     }
   });
 
-  // Свайпы на мобильных
-  setupSwipe(lightbox, prevPhoto, nextPhoto, closeLightbox);
-
-  // Клики по картинке на мобильных
-  lightboxImg.addEventListener('click', function(e) {
-    if (window.innerWidth > 600) return;
-    const rect = lightboxImg.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x < rect.width / 2) {
-      prevPhoto();
-    } else {
-      nextPhoto();
-    }
-  });
+  // Смена фото на тач-устройствах — интерактивным свайпом:
+  // кадр следует за пальцем, отпускание листает или возвращает на место.
+  setupSwipe(lightbox, lightboxImg, prevPhoto, nextPhoto, closeLightbox);
 }
 
 function setupInfiniteScroll(gallery, cardRevealer) {
@@ -521,7 +746,7 @@ function initUploadForm() {
   let uploading = false;
   const previewCache = new Map(); // file -> Promise<dataURL> (J2: не перекодируем повторно)
   const previewNodes = new Map(); // file -> wrapper element
-  const fileLabelText = form.querySelector('.file-upload-label span');
+  const fileLabelText = form.querySelector('.file-upload-text');
   const defaultLabelText = fileLabelText ? fileLabelText.textContent : '';
   submitBtn.disabled = true;
 
@@ -621,11 +846,17 @@ function initUploadForm() {
           removeBtn.setAttribute('aria-label', `Удалить ${file.name}`);
           removeBtn.textContent = '×';
           removeBtn.addEventListener('click', () => {
-              if (uploading) return;
-              selectedFiles.splice(i, 1);
-              previewCache.delete(file);
-              updateFileInput();
-              renderPreviews();
+              if (uploading || wrapper.classList.contains('is-removing')) return;
+              // Сначала карточка плавно схлопывается, потом перерисовка.
+              // Индекс ищем по файлу: за время анимации список мог измениться.
+              wrapper.classList.add('is-removing');
+              setTimeout(() => {
+                  const index = selectedFiles.indexOf(file);
+                  if (index !== -1) selectedFiles.splice(index, 1);
+                  previewCache.delete(file);
+                  updateFileInput();
+                  renderPreviews();
+              }, 200);
           });
 
           wrapper.append(img, removeBtn);
@@ -723,6 +954,7 @@ function initUploadForm() {
 
       uploading = true;
       submitBtn.disabled = true;
+      submitBtn.classList.add('is-loading');
       preview.classList.add('is-busy');
       setUploadStatus('', '');
 
@@ -787,9 +1019,11 @@ function initUploadForm() {
       preview.classList.remove('is-busy');
 
       if (!failedFiles.length) {
+          // Спиннер остаётся до ухода со страницы — редирект уже запущен
           window.location.href = redirectUrl;
           return;
       }
+      submitBtn.classList.remove('is-loading');
 
       selectedFiles = failedFiles;
       updateFileInput();
@@ -816,38 +1050,78 @@ function preventDefaults(e) {
   e.stopPropagation();
 }
 
-function setupSwipe(lightbox, prev, next, close) {
+// Интерактивный свайп: тач-события приходят только с сенсорных экранов,
+// поэтому отдельная проверка «мобилка или нет» не нужна.
+function setupSwipe(lightbox, img, prev, next, close) {
   let startX = null;
   let startY = null;
+  let axis = null; // 'x' | 'y' — фиксируется по первому движению
+  let tracking = false;
+
+  const resetDrag = () => {
+      img.classList.remove('is-dragging');
+      img.style.transform = '';
+      img.style.opacity = '';
+  };
 
   lightbox.addEventListener('touchstart', function(e) {
-      if (window.innerWidth > 600) return;
-      if (e.touches.length === 1) {
-          startX = e.touches[0].clientX;
-          startY = e.touches[0].clientY;
+      if (e.touches.length !== 1) {
+          tracking = false;
+          return;
       }
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      axis = null;
+      tracking = true;
+  }, { passive: true });
+
+  lightbox.addEventListener('touchmove', function(e) {
+      if (!tracking) return;
+      const dX = e.touches[0].clientX - startX;
+      const dY = e.touches[0].clientY - startY;
+
+      // Ось жеста определяется один раз — диагональ не даёт
+      // одновременно и листать, и закрывать.
+      if (!axis) {
+          if (Math.abs(dX) < 8 && Math.abs(dY) < 8) return;
+          axis = Math.abs(dX) > Math.abs(dY) ? 'x' : 'y';
+      }
+      if (axis !== 'x') return;
+
+      // Кадр следует за пальцем и слегка тает к краям экрана.
+      // Классы входной анимации снимаем: работающая CSS-анимация
+      // перебивала бы inline-transform жеста.
+      img.classList.remove('slide-from-left', 'slide-from-right');
+      img.classList.add('is-dragging');
+      img.style.transform = `translateX(${dX}px)`;
+      img.style.opacity = String(
+          Math.max(0.35, 1 - Math.abs(dX) / window.innerWidth)
+      );
   }, { passive: true });
 
   lightbox.addEventListener('touchend', function(e) {
-      if (window.innerWidth > 600) return;
-      if (startX === null || startY === null) return;
+      if (!tracking) return;
+      tracking = false;
       const dX = e.changedTouches[0].clientX - startX;
       const dY = e.changedTouches[0].clientY - startY;
-      startX = null;
-      startY = null;
+      resetDrag();
 
-      // Листаем только когда горизонталь доминирует —
-      // диагональный жест больше не перелистывает случайно.
-      if (Math.abs(dX) > 50 && Math.abs(dX) > Math.abs(dY)) {
+      if (axis === 'x' && Math.abs(dX) > 60) {
+          // Палец увёл кадр влево — приходит следующий, и наоборот
           if (dX > 0) prev();
           else next();
           return;
       }
 
-      // Свайп вниз закрывает просмотр
-      if (dY > 70 && Math.abs(dY) > Math.abs(dX) && typeof close === 'function') {
+      // Вертикальный жест вниз закрывает просмотр
+      if (axis === 'y' && dY > 70 && typeof close === 'function') {
           close();
       }
+  }, { passive: true });
+
+  lightbox.addEventListener('touchcancel', function() {
+      tracking = false;
+      resetDrag();
   }, { passive: true });
 }
 
@@ -896,7 +1170,32 @@ function createGalleryCard(photo) {
   }
 
   card.appendChild(img);
+
+  // Чип-подпись — только у снимков с настоящим названием (как в шаблоне)
+  if (photo.title || photo.alt_text) {
+    const label = document.createElement('span');
+    label.className = 'card-label';
+    label.setAttribute('aria-hidden', 'true');
+    label.textContent = photoLabel;
+    card.appendChild(label);
+  }
+
   return card;
+}
+
+// Идемпотентное завершение WAAPI-анимации: finished может не резолвиться
+// (фоновая вкладка, cancel) — страхуемся таймаутом, колбэк ровно один раз.
+function settleAnimation(animation, timeoutMs, done) {
+  let called = false;
+  const once = () => {
+    if (called) return;
+    called = true;
+    done();
+  };
+  if (animation && animation.finished) {
+    animation.finished.then(once, once);
+  }
+  setTimeout(once, timeoutMs);
 }
 
 function parsePositiveInt(value, fallback) {

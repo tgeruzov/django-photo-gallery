@@ -91,41 +91,38 @@
   </head>
   <body>
     <a class="skip-link" href="#main">К содержимому</a>
-    <button class="theme-toggle" aria-label="Переключить тему" title="Переключить тему">
-      <svg class="theme-toggle-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-      </svg>
-      <svg class="theme-toggle-icon theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-      </svg>
-    </button>
-    {% if user.is_staff or user.is_superuser %}
-    <a class="upload-toggle" aria-label="Загрузить фото" title="Загрузить фото" href="{% url 'gallery:upload_photo' %}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 5v14M5 12h14" />
-      </svg>
-    </a>
-    {% endif %}
-    <header>
-      <div class="header-glow">
-        <div class="glow-circle"></div>
-        <div class="glow-circle"></div>
-        <div class="glow-circle"></div>
-        <div class="glow-circle"></div>
-        <div class="glow-circle"></div>
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="/">{{ seo_site_name|default:"Timur Geruzov" }}</a>
+        <div class="topbar-actions">
+          {% if user.is_staff or user.is_superuser %}
+          <a class="icon-btn upload-toggle" aria-label="Загрузить фото" title="Загрузить фото" href="{% url 'gallery:upload_photo' %}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </a>
+          {% endif %}
+          <button class="icon-btn theme-toggle" aria-label="Переключить тему" title="Переключить тему">
+            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+            </svg>
+            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
+        </div>
       </div>
-      <h1>
-        <a class="header-home-link" href="/">{% block hero_title %}{{ hero_title|default:"Timur Geruzov" }}{% endblock %}</a>
-      </h1>
-      {% if hero_description %}
-      <p>{% block hero_description %}{{ hero_description }}{% endblock %}</p>
-      {% endif %}
     </header>
     <main id="main">{% block content %}{% endblock %}</main>
     <footer class="site-footer">
       <p>© {% now "Y" %} {{ seo_site_name|default:"Timur Geruzov" }} — авторская фотогалерея</p>
     </footer>
+    <button class="icon-btn scroll-top" type="button" aria-label="Наверх" title="Наверх">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5m0 0-6 6m6-6 6 6" />
+      </svg>
+    </button>
     <script src="{% static 'js/script.js' %}"></script>
     {% block scripts %}{% endblock %}
   </body>
