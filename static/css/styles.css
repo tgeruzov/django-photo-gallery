@@ -1,215 +1,704 @@
-@import url("https://fonts.googleapis.com/css2?family=Funnel+Sans:ital,wght@0,300..800;1,300..800&display=swap");
+/* ==========================================================================
+   Timur Geruzov — photo gallery
+   Design system: «тихая галерея» — хром отступает, фотографии доминируют.
+
+   Оглавление:
+     1. Токены (цвет, типографика, отступы, радиусы, тени, движение)
+     2. База и сброс
+     3. Доступность (skip-link, focus, reduced-motion)
+     4. Topbar (sticky-шапка)
+     5. Смена темы (круговая заливка view-transition)
+     6. Галерея и карточки
+     7. Статус ленты (бесконечный скролл)
+     8. Лайтбокс
+     9. Страница загрузки
+    10. Уведомления (alerts)
+    11. Пустое состояние и страницы ошибок
+    12. Футер
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Токены
+   -------------------------------------------------------------------------- */
 
 :root {
-  --gap: 1rem;
-  --radius: 8px;
-  --transition-speed: 0.3s;
-  --header-offset: 150px;
-  --pure-white: #f7f7f7;
-  --pure-black: #1a1a1a;
-  --color-1: #f2f9fd;
-  --color-2: #e5f1f9;
-  --color-3: #c4e3f3;
-  --color-4: #91cce8;
-  --accent-color: #56b2da;
-  --color-6: #3099c7;
-  --color-7: #217ba8;
-  --color-8: #1c6288;
-  --color-9: #1b5371;
-  --color-10: #1b465f;
-  --color-11: #122d3f;
-  --bg-color: var(--pure-black);
-  --text-color: var(--pure-white);
-  --overlay-color: rgba(0, 0, 0, 0.7);
-  --form-bg: var(--color-11);
-  --form-text: var(--color-1);
-  --disabled-bg-dark: var(--color-10);
-  --disabled-text-dark: var(--color-4);
-  --disabled-bg-light: var(--color-3);
-  --disabled-text-light: var(--accent-color);
-  --disabled-bg: var(--disabled-bg-dark);
-  --disabled-text: var(--disabled-text-dark);
+  color-scheme: dark;
+
+  /* Типографика */
+  --font-sans: "Funnel Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-title: clamp(1.6rem, 1.2rem + 1.6vw, 2.1rem);
+  --text-display: clamp(2.4rem, 1.4rem + 4vw, 3.9rem);
+  --leading-tight: 1.1;
+  --leading-normal: 1.6;
+  --tracking-tight: -0.02em;
+  --tracking-wide: 0.04em;
+
+  /* Шкала отступов — сетка 4px */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.25rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+  --sp-10: 2.5rem;
+  --sp-12: 3rem;
+  --sp-16: 4rem;
+
+  /* Геометрия */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --container: 1560px;
+  --container-pad: clamp(1rem, 3.5vw, 2rem);
+  --topbar-h: 64px;
+
+  /* Движение */
+  --dur-1: 150ms;
+  --dur-2: 260ms;
+  --dur-3: 480ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Палитра — тёмная тема (по умолчанию) */
+  --bg: #0c0d0f;
+  --bg-elevated: #131518;
+  --surface: #17191d;
+  --surface-2: #1e2126;
+  --border: rgba(235, 240, 245, 0.09);
+  --border-strong: rgba(235, 240, 245, 0.18);
+  --text-1: #f0f2f4;
+  --text-2: rgba(240, 242, 244, 0.68);
+  --text-3: rgba(240, 242, 244, 0.46);
+
+  /* Акцент: декор — светлый, интерактив — контрастный к теме */
+  --accent: #56b2da;
+  --accent-text: #7cc5ea;
+  --accent-tint: rgba(86, 178, 218, 0.12);
+  --accent-tint-strong: rgba(86, 178, 218, 0.2);
+  --cta-bg: #56b2da;
+  --cta-bg-hover: #6fc0e2;
+  --cta-bg-active: #46a3cc;
+  --cta-text: #06222f;
+
+  /* Семантика */
+  --danger-text: #f0808a;
+  --danger-tint: rgba(220, 70, 84, 0.14);
+  --danger-border: rgba(220, 70, 84, 0.4);
+  --danger-solid: #c8323c;
+  --success-text: #7ecbb4;
+  --success-tint: rgba(52, 168, 133, 0.14);
+  --success-border: rgba(52, 168, 133, 0.4);
+
+  /* Тени и эффекты */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.5);
+  --shimmer: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(8, 9, 10, 0.82);
+  --topbar-bg: rgba(12, 13, 15, 0.6);
+
+  /* Liquid glass: полупрозрачные поверхности с бликом по верхней кромке */
+  --glass-bg: rgba(26, 29, 34, 0.52);
+  --glass-bg-hover: rgba(44, 49, 56, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.14);
+
+  /* Мягкие цветовые пятна на фоне — стеклу есть что преломлять */
+  --ambient-1: rgba(86, 178, 218, 0.08);
+  --ambient-2: rgba(122, 104, 220, 0.07);
 }
 
-body.light {
-  --bg-color: var(--pure-white);
-  --text-color: #222;
-  --overlay-color: rgba(255, 255, 255, 0.7);
-  --form-bg: var(--color-2);
-  --form-text: var(--color-11);
-  --disabled-bg: var(--disabled-bg-light);
-  --disabled-text: var(--disabled-text-light);
+html.light {
+  color-scheme: light;
+
+  --bg: #f7f7f5;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #eef0f1;
+  --border: rgba(15, 20, 25, 0.1);
+  --border-strong: rgba(15, 20, 25, 0.22);
+  --text-1: #16181a;
+  --text-2: rgba(22, 24, 26, 0.66);
+  --text-3: rgba(22, 24, 26, 0.45);
+
+  --accent-text: #1c6a94; /* ≥4.5:1 на --bg — текстовые ссылки читаемы (C4) */
+  --accent-tint: rgba(86, 178, 218, 0.14);
+  --accent-tint-strong: rgba(86, 178, 218, 0.24);
+  --cta-bg: #1f78a8;
+  --cta-bg-hover: #1c6a94;
+  --cta-bg-active: #185d83;
+  --cta-text: #ffffff;
+
+  --danger-text: #b02a37;
+  --danger-tint: rgba(200, 50, 60, 0.1);
+  --danger-border: rgba(200, 50, 60, 0.35);
+  --success-text: #17705a;
+  --success-tint: rgba(52, 168, 133, 0.12);
+  --success-border: rgba(52, 168, 133, 0.35);
+
+  --shadow-sm: 0 1px 2px rgba(20, 30, 40, 0.08);
+  --shadow-md: 0 6px 24px rgba(20, 30, 40, 0.12);
+  --shadow-lg: 0 24px 64px rgba(20, 30, 40, 0.18);
+  --shimmer: rgba(0, 0, 0, 0.05);
+  --topbar-bg: rgba(247, 247, 245, 0.55);
+
+  --glass-bg: rgba(255, 255, 255, 0.5);
+  --glass-bg-hover: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(15, 20, 25, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.85);
+
+  --ambient-1: rgba(86, 178, 218, 0.12);
+  --ambient-2: rgba(255, 176, 116, 0.1);
 }
 
-* {
+/* --------------------------------------------------------------------------
+   2. База и сброс
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-.funnel-sans-unique {
-  font-family: "Funnel Sans", sans-serif;
-  font-optical-sizing: auto;
-  font-weight: 800;
-  font-style: normal;
+html {
+  scrollbar-gutter: stable;
 }
 
 body {
-  font-family: "Funnel Sans", system-ui, sans-serif;
-  background: var(--bg-color);
-  color: var(--text-color);
-  transition: background var(--transition-speed), color var(--transition-speed);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  /* Ambient-подсветка: стеклянные панели размывают эти пятна,
+     за счёт чего «жидкое стекло» читается даже на пустых страницах */
+  background:
+    radial-gradient(820px 520px at 88% -12%, var(--ambient-1), transparent 62%),
+    radial-gradient(720px 480px at -12% 28%, var(--ambient-2), transparent 62%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--text-1);
+  transition: color var(--dur-2) var(--ease);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
-header {
+main {
+  flex: 1;
+}
+
+img {
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--accent-tint-strong);
+}
+
+/* Плёночное зерно поверх всего интерфейса — статичная SVG-текстура,
+   задаёт «авторский» фотографический характер почти бесплатно для GPU */
+body::after {
+  content: "";
   position: fixed;
+  inset: 0;
+  z-index: 3000;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="160" height="160" filter="url(%23n)" opacity="0.6"/></svg>');
+  background-size: 160px 160px;
+}
+
+html.light body::after {
+  opacity: 0.035;
+}
+
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--container-pad);
+}
+
+/* UX14: плавный переход между страницами (прогрессивно) */
+@view-transition {
+  navigation: auto;
+}
+
+/* --------------------------------------------------------------------------
+   3. Доступность
+   -------------------------------------------------------------------------- */
+
+.skip-link {
+  position: fixed;
+  top: -100%;
+  left: var(--sp-4);
+  z-index: 2000;
+  padding: var(--sp-3) var(--sp-5);
+  background: var(--cta-bg);
+  color: var(--cta-text);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  text-decoration: none;
+  font-weight: 600;
+  transition: top var(--dur-1) var(--ease);
+}
+
+.skip-link:focus {
   top: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Скрыто визуально, но доступно скринридерам и поисковикам
+   (главная больше не показывает hero-заголовок, но <h1> остаётся). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* C3: уважение prefers-reduced-motion — глушим фоновые анимации
+   и сводим переходы к мгновенным */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   4. Topbar — тонкая sticky-шапка вместо фиксированного hero:
+      контент больше не живёт под магическим --header-offset (C1)
+   -------------------------------------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  background: linear-gradient(var(--glass-highlight), transparent 45%) top / 100% 1.5px no-repeat,
+    var(--topbar-bg);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+
+.topbar.is-scrolled {
+  border-bottom-color: var(--glass-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Прогресс-волосок: тонкая градиентная линия под шапкой отражает
+   глубину прокрутки бесконечной ленты (--scroll-progress пишет JS) */
+.topbar::after {
+  content: "";
+  position: absolute;
   left: 0;
   right: 0;
-  overflow: hidden;
-  padding: 0.5rem;
-  text-align: center;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  z-index: 100;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(245, 245, 245, 0.82);
-  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.08);
-}
-
-body:not(.light) header {
-  background: rgba(40, 40, 40, 0.82);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-body.light header {
-  background: rgba(245, 245, 245, 0.92);
-  box-shadow: 0 2px 16px 0 rgba(86, 178, 218, 0.07);
-  border-bottom: 1px solid rgba(180, 200, 220, 0.12);
-}
-
-.header-glow {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  z-index: -1;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-text));
+  transform: scaleX(var(--scroll-progress, 0));
+  transform-origin: left;
+  opacity: 0.85;
   pointer-events: none;
 }
 
-.glow-circle {
+/* Кнопка «наверх»: стеклянная капсула, всплывает в глубине ленты */
+.scroll-top {
+  position: fixed;
+  right: var(--sp-5);
+  bottom: var(--sp-5);
+  z-index: 900;
+  opacity: 0;
+  transform: translateY(12px) scale(0.9);
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-3) var(--ease-spring);
+}
+
+.scroll-top.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.scroll-top:hover svg {
+  transform: translateY(-2px);
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.brand {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-1);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--dur-1) var(--ease);
+}
+
+.brand:hover {
+  opacity: 0.75;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* Иконки-действия: стеклянные капсулы, touch-target ≥44px (C8) */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  color: var(--text-2);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+    transform var(--dur-2) var(--ease-spring), box-shadow var(--dur-2) var(--ease);
+}
+
+.icon-btn:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-1);
+  transform: translateY(-1px);
+}
+
+.icon-btn:active {
+  transform: scale(0.9);
+}
+
+.icon-btn svg {
+  width: 21px;
+  height: 21px;
+  transition: transform var(--dur-3) var(--ease-spring);
+}
+
+.upload-toggle:hover svg {
+  transform: rotate(90deg) scale(1.08);
+}
+
+/* Переключатель темы: солнце и луна лежат в стопке и меняются
+   крест-переходом с вращением — не мгновенным display-свапом */
+.theme-toggle {
+  position: relative;
+}
+
+.theme-toggle .theme-icon-sun,
+.theme-toggle .theme-icon-moon {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.55;
-  animation: move-glow 14s infinite alternate ease-in-out;
-  mix-blend-mode: lighten;
+  inset: 0;
+  margin: auto;
+  transition: transform var(--dur-3) var(--ease-spring), opacity var(--dur-2) var(--ease);
 }
 
-.glow-circle:nth-child(1) {
-  width: 480px;
-  height: 480px;
-  background: #b7dff6;
-  top: 5%;
-  left: -8%;
-  animation-duration: 13s;
+/* Тёмная тема: видно солнце, луна «спрятана в повороте» */
+.theme-icon-moon {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.4);
 }
 
-.glow-circle:nth-child(2) {
-  width: 400px;
-  height: 400px;
-  background: #ffe7c2;
-  top: 28%;
-  left: 14%;
-  animation-duration: 16s;
+html.light .theme-icon-sun {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.4);
 }
 
-.glow-circle:nth-child(3) {
-  width: 440px;
-  height: 440px;
-  background: #cbeed7;
-  top: 0%;
-  left: 38%;
-  animation-duration: 12s;
+html.light .theme-icon-moon {
+  opacity: 1;
+  transform: rotate(0) scale(1);
 }
 
-.glow-circle:nth-child(4) {
-  width: 380px;
-  height: 380px;
-  background: #f9dbe6;
-  top: 32%;
-  left: 62%;
-  animation-duration: 15s;
+/* Живые иконки при наведении: солнце прокручивается, луна покачивается */
+html:not(.light) .theme-toggle:hover .theme-icon-sun {
+  transform: rotate(90deg);
 }
 
-.glow-circle:nth-child(5) {
-  width: 350px;
-  height: 350px;
-  background: #e6e3fa;
-  top: 8%;
-  left: 80%;
-  animation-duration: 14s;
+html.light .theme-toggle:hover .theme-icon-moon {
+  transform: rotate(-18deg) scale(1.08);
 }
 
-@media (max-width: 900px) {
-  .header-glow .glow-circle:nth-child(n + 4) {
-    display: none;
-  }
+/* --------------------------------------------------------------------------
+   5. Смена темы — круговая заливка от кнопки-переключателя.
+      Дефолтный кросс-фейд view-transition отключается только на время
+      смены темы (класс ставит JS), навигационный переход не трогаем.
+   -------------------------------------------------------------------------- */
+
+html.theme-switching::view-transition-old(root),
+html.theme-switching::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
-@keyframes move-glow {
-  0% {
-    transform: translate(0, 0);
-  }
-  100% {
-    transform: translate(50px, -50px);
-  }
-}
-
-header h1 {
-  font-size: 3rem;
-  margin-bottom: 0.5rem;
-  color: #f7f7f7; /* Светлый текст для тёмной темы */
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255, 255, 255, 0.08);
-  font-family: "Funnel Sans", system-ui, sans-serif;
-}
-
-body.light header h1 {
-  color: #222; /* Тёмный текст для светлой темы */
-  text-shadow: 0 2px 8px rgba(255, 255, 255, 0.18), 0 1px 0 rgba(86, 178, 218, 0.06);
-}
-
-header p {
-  font-size: 1.2rem;
-  opacity: 0.9;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 1rem;
-  line-height: 1.4;
-  font-family: "Funnel Sans", system-ui, sans-serif;
-}
+/* --------------------------------------------------------------------------
+   6. Галерея и карточки
+   -------------------------------------------------------------------------- */
 
 .gallery {
-  margin-top: calc(var(--header-offset) + 2rem);
+  /* C5 (осознанно): column-count раскладывает фото по колонкам сверху вниз,
+     поэтому визуальный порядок не совпадает с хронологией/лайтбоксом.
+     CSS Grid сохранил бы порядок, но менял бы характер masonry-раскладки —
+     оставлено как продуктовое решение. */
   column-count: 3;
-  column-gap: var(--gap);
-  max-width: 1500px;
-  margin-left: auto;
-  margin-right: auto;
-  margin-bottom: 2rem;
+  column-gap: var(--sp-4);
+  /* Верхний отступ заменяет убранный hero-баннер — лента не липнет к topbar */
+  padding-block: var(--sp-8);
 }
 
-.gallery-feed-status {
-  min-height: 1.5rem;
-  max-width: 1500px;
-  margin: 0 auto 0.75rem;
-  padding: 0 1rem;
-  text-align: center;
-  color: rgba(86, 178, 218, 0.95);
-  font-size: 0.95rem;
+@media (min-width: 1800px) {
+  .gallery {
+    column-count: 4;
+  }
+}
+
+@media (max-width: 1100px) {
+  .gallery {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 700px) {
+  .gallery {
+    column-count: 1;
+  }
+}
+
+.card {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-bottom: var(--sp-4);
+  break-inside: avoid;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: initial;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: transform var(--dur-3) var(--ease-out);
+}
+
+/* UX1+UX13: при работающем JS до загрузки прячется только изображение,
+   а карточка держит место и показывает шиммер — лента не «прыгает».
+   Без JS галерея видна сразу. */
+html.js .card:not(.loaded) {
+  /* Микроповорот в разные стороны — карточки «ложатся» на стол, а не
+     выезжают конвейером; угол гаснет к нулю при появлении */
+  transform: translateY(14px) rotate(0.6deg);
+  background: linear-gradient(100deg, transparent 30%, var(--shimmer) 50%, transparent 70%);
+  background-size: 200% 100%;
+  background-color: var(--surface);
+  animation: shimmer 1.4s infinite;
+}
+
+html.js .card:not(.loaded) img {
   opacity: 0;
-  transition: opacity var(--transition-speed) ease;
+}
+
+html.js .card:nth-child(even):not(.loaded) {
+  transform: translateY(14px) rotate(-0.6deg);
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.card.loaded {
+  transform: translateY(0);
+}
+
+/* Наведение: карточка приподнимается, тень (::after) проявляется */
+.card.loaded:hover {
+  transform: translateY(-4px);
+}
+
+/* 3D-наклон за курсором + блик, бегающий по стеклу (только точный
+   указатель). Углы --rx/--ry пишет JS; здесь только их применение. */
+@media (hover: hover) and (pointer: fine) {
+  .card.loaded {
+    transform: perspective(700px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
+    transition: transform 200ms var(--ease);
+  }
+
+  .card.loaded:hover {
+    transform: perspective(700px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg))
+      translateY(-4px);
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: var(--radius-md);
+    background: radial-gradient(
+      260px circle at calc(var(--px, 0.5) * 100%) calc(var(--py, 0.5) * 100%),
+      rgba(255, 255, 255, 0.22),
+      transparent 65%
+    );
+    opacity: 0;
+    mix-blend-mode: overlay;
+    transition: opacity var(--dur-2) var(--ease);
+    pointer-events: none;
+  }
+
+  .card:hover::before {
+    opacity: 1;
+  }
+}
+
+/* Подпись снимка — стеклянный чип, всплывающий при наведении
+   (рендерится только у фото с настоящим названием) */
+.card-label {
+  position: absolute;
+  left: var(--sp-3);
+  bottom: var(--sp-3);
+  z-index: 1;
+  max-width: calc(100% - var(--sp-6));
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-full);
+  background: rgba(20, 22, 25, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-3) var(--ease-spring);
+  pointer-events: none;
+}
+
+.card:hover .card-label,
+.card:focus-visible .card-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* UX10: hover-тень анимируется через opacity псевдоэлемента
+   (box-shadow вызывал repaint на каждом кадре) */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
+  pointer-events: none;
+}
+
+.card:hover::after {
+  opacity: 1;
+}
+
+.card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  transition: transform var(--dur-3) var(--ease-out), opacity var(--dur-3) var(--ease-out);
+}
+
+.card:hover img {
+  transform: scale(1.015);
+}
+
+.card:active img {
+  transform: scale(0.985);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.card.card-empty {
+  cursor: default;
+}
+
+.no-image-placeholder {
+  display: grid;
+  place-items: center;
+  height: 200px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  background: var(--surface);
+}
+
+/* --------------------------------------------------------------------------
+   7. Статус ленты
+   -------------------------------------------------------------------------- */
+
+.gallery-feed-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  min-height: 2rem;
+  margin-bottom: var(--sp-6);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
 }
 
 .gallery-feed-status[data-state="loading"],
@@ -217,8 +706,25 @@ header p {
   opacity: 1;
 }
 
+.gallery-feed-status[data-state="loading"]::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .gallery-feed-status[data-state="error"] {
-  color: #d86a75;
+  color: var(--danger-text);
 }
 
 .gallery-sentinel {
@@ -226,257 +732,305 @@ header p {
   height: 1px;
 }
 
-@media (max-width: 1200px) {
-  .gallery {
-    column-count: 2;
-  }
-}
-
-@media (max-width: 768px) {
-  .gallery {
-    column-count: 1;
-  }
-}
-
-.card {
-  margin-bottom: var(--gap);
-  break-inside: avoid;
-  display: block;
-  opacity: 0;
-  transform: scale(0.95);
-  transition: opacity var(--transition-speed) ease-out, transform var(--transition-speed) ease-out, box-shadow var(--transition-speed);
-  cursor: pointer;
-  width: 100%;
-  border: 0;
+.feed-retry {
+  padding: var(--sp-1) var(--sp-4);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-full);
   background: transparent;
-  padding: 0;
-  text-align: initial;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition: background var(--dur-1) var(--ease);
 }
 
-.card.loaded {
-  opacity: 1;
-  transform: scale(1);
+.feed-retry:hover {
+  background: var(--danger-tint);
 }
 
-.card.card-empty {
-  cursor: default;
-}
+/* --------------------------------------------------------------------------
+   8. Лайтбокс
+   -------------------------------------------------------------------------- */
 
-.card img {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: var(--radius);
-  transition: transform var(--transition-speed), box-shadow var(--transition-speed);
-}
-
-.card:hover img {
-  transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.card:active img {
-  transform: scale(0.98);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.card:focus-visible {
-  outline: 2px solid var(--accent-color);
-  outline-offset: 2px;
-  border-radius: var(--radius);
-}
-
+/* Скрим — отдельный слой (::before): при zoom-закрытии фон гаснет,
+   пока фото летит обратно в свою карточку, как в галерее iPhone.
+   visibility скрывает слой только после того, как полёт завершён. */
 .lightbox {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.9);
+  inset: 0;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transition: opacity var(--transition-speed);
-  z-index: 1000;
+  transition: visibility 0s linear 0.5s;
+}
+
+.lightbox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
 }
 
 .lightbox.active {
-  opacity: 1;
+  visibility: visible;
   pointer-events: all;
+  transition: visibility 0s;
+}
+
+.lightbox.active::before {
+  opacity: 1;
+}
+
+/* Ambient-свечение: фото «подсвечивает комнату» своим доминирующим
+   цветом (--photo-glow вычисляет JS по пикселям снимка) */
+.lightbox::after {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  z-index: 0;
+  background: radial-gradient(
+    55% 45% at 50% 50%,
+    var(--photo-glow, transparent),
+    transparent 72%
+  );
+  opacity: 0;
+  transition: opacity var(--dur-3) var(--ease);
+  pointer-events: none;
+}
+
+.lightbox.active::after {
+  opacity: 1;
 }
 
 .lightbox img {
-  max-width: 90%;
-  max-height: 90%;
-  border-radius: var(--radius);
+  position: relative; /* поверх скрима */
+  z-index: 1;
+  max-width: min(92vw, 1800px);
+  max-height: 86vh;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  /* Вход/выход анимирует JS (FLIP от карточки); transition — только
+     для blur-up и упругого возврата после незавершённого свайпа */
+  transition: filter var(--dur-2) var(--ease), transform var(--dur-3) var(--ease-out);
+  will-change: transform;
 }
 
+/* Blur-up: пока грузится полная версия, показываем размытую миниатюру */
+.lightbox img.is-loading {
+  filter: blur(10px);
+}
+
+/* Направленное перелистывание: новое фото въезжает со стороны движения.
+   Класс перевешивается в JS с принудительным reflow — анимация
+   проигрывается на каждой смене кадра. */
+.lightbox img.slide-from-right {
+  animation: lb-slide-right var(--dur-2) var(--ease-out);
+}
+
+.lightbox img.slide-from-left {
+  animation: lb-slide-left var(--dur-2) var(--ease-out);
+}
+
+@keyframes lb-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+@keyframes lb-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+
+/* Пока палец ведёт фото — без переходов, следуем за жестом мгновенно */
+.lightbox img.is-dragging {
+  transition: none;
+}
+
+/* Стеклянные управляющие кнопки: проявляются после открытия,
+   гаснут первыми при закрытии — фото всегда «главный герой» */
+.lightbox-close,
 .lightbox-prev,
 .lightbox-next {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(40, 40, 40, 0.35);
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  font-size: 2.2rem;
+  z-index: 1010;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-full);
+  background: rgba(30, 33, 38, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  color: #fff;
   cursor: pointer;
-  z-index: 1010;
-  box-shadow: 0 2px 8px rgba(40, 40, 40, 0.15);
-  transition: transform 0.2s ease, background 0.2s ease;
-  opacity: 0.92;
-  font-family: "Material Icons", "Funnel Sans", system-ui, sans-serif;
-  font-style: normal;
-  font-weight: normal;
-  letter-spacing: normal;
-  text-transform: none;
-  direction: ltr;
-  -webkit-font-feature-settings: "liga";
-  font-feature-settings: "liga";
+  opacity: 0;
+  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease),
+    opacity var(--dur-2) var(--ease);
 }
 
+.lightbox.active .lightbox-close,
+.lightbox.active .lightbox-prev,
+.lightbox.active .lightbox-next {
+  opacity: 1;
+}
+
+/* Иконки кнопок отзываются на наведение: крестик проворачивается,
+   стрелки подталкиваются в сторону будущего перелистывания */
+.lightbox-close svg,
+.lightbox-prev svg,
+.lightbox-next svg {
+  transition: transform var(--dur-3) var(--ease-spring);
+}
+
+.lightbox-close:hover svg {
+  transform: rotate(90deg);
+}
+
+.lightbox-prev:hover svg {
+  transform: translateX(-3px);
+}
+
+.lightbox-next:hover svg {
+  transform: translateX(3px);
+}
+
+.lightbox-close:hover,
 .lightbox-prev:hover,
 .lightbox-next:hover {
-  transform: translateY(-50%) scale(1.1);
-  background: rgba(40, 40, 40, 0.5);
+  background: rgba(45, 48, 53, 0.65);
+}
+
+.lightbox-close:active,
+.lightbox-prev:active,
+.lightbox-next:active {
+  transform: scale(0.92);
 }
 
 .lightbox-prev:active,
 .lightbox-next:active {
-  transform: translateY(-50%) scale(0.95);
-  background: rgba(40, 40, 40, 0.7);
-  -webkit-font-smoothing: antialiased;
+  transform: translateY(-50%) scale(0.92);
 }
 
+.lightbox-close:focus-visible,
 .lightbox-prev:focus-visible,
 .lightbox-next:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
 }
 
+.lightbox-close {
+  top: var(--sp-4);
+  right: var(--sp-4);
+}
+
+.lightbox-prev,
+.lightbox-next {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 .lightbox-prev {
-  left: 2vw;
+  left: clamp(var(--sp-3), 2vw, var(--sp-8));
 }
 
 .lightbox-next {
-  right: 2vw;
+  right: clamp(var(--sp-3), 2vw, var(--sp-8));
 }
 
-.theme-toggle {
-  position: fixed;
-  top: 2rem;
-  right: 1rem;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  z-index: 1000;
-  transition: transform 0.1s ease;
+.lightbox-prev:hover,
+.lightbox-next:hover {
+  transform: translateY(-50%) scale(1.06);
 }
 
-.theme-toggle:hover {
-  transform: scale(1.1);
+.lightbox-counter {
+  position: absolute;
+  top: var(--sp-5);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1010;
+  padding: var(--sp-1) var(--sp-4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-full);
+  background: rgba(30, 33, 38, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease);
 }
 
-.theme-toggle:active {
-  transform: scale(0.9);
+.lightbox.active .lightbox-counter {
+  opacity: 1;
 }
 
-.theme-toggle:focus-visible {
-  outline: 2px solid var(--accent-color);
-  outline-offset: 2px;
-  border-radius: 999px;
+.lightbox-counter:empty {
+  display: none;
 }
 
-.theme-toggle-icon {
-  color: var(--text-color);
-  transition: color 0.3s ease;
-  font-family: "Funnel Sans", system-ui, sans-serif;
+/* Подсказка о свайпе: видимостью управляет JS (показывается
+   один раз за сессию и только на мобильных) */
+.lightbox-hint {
+  display: none;
+  position: absolute;
+  bottom: var(--sp-10);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 90vw;
+  padding: var(--sp-2) var(--sp-5);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-full);
+  background: rgba(30, 33, 38, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--text-sm);
+  pointer-events: none;
+  z-index: 1100;
+  transition: opacity var(--dur-3) var(--ease);
 }
 
-.upload-toggle {
-  position: fixed;
-  top: 2rem;
-  right: 4rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  z-index: 1000;
-  transition: transform 0.1s ease;
-  text-decoration: none;
-  color: inherit;
+/* --------------------------------------------------------------------------
+   9. Страница загрузки
+   -------------------------------------------------------------------------- */
+
+.page {
+  padding-block: var(--sp-6) var(--sp-12);
 }
 
-.upload-toggle svg {
-  width: 24px;
-  height: 24px;
-  color: var(--text-color);
-  stroke-width: 3;
+.upload-page {
+  max-width: 680px;
+  margin-inline: auto;
 }
 
-.upload-toggle:hover {
-  transform: scale(1.1);
-}
-
-.upload-toggle:focus-visible {
-  outline: 2px solid var(--accent-color);
-  outline-offset: 2px;
-  border-radius: 999px;
-}
-
-.upload-container {
-  margin-top: calc(var(--header-offset) + 2rem);
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 2rem;
-  border-radius: var(--radius);
-  backdrop-filter: blur(10px);
-}
-
-.alert {
-  margin-bottom: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius);
-  font-size: 0.95rem;
-  background: rgba(86, 178, 218, 0.12);
-  border: 1px solid rgba(86, 178, 218, 0.25);
-  color: var(--text-color);
-}
-
-.alert-success {
-  border-color: rgba(86, 178, 218, 0.4);
-}
-
-.alert-warning,
-.alert-error,
-.alert-danger {
-  border-color: rgba(200, 50, 60, 0.4);
-  background: rgba(200, 50, 60, 0.12);
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 100%;
-  max-width: 600px;
-  margin: 0 auto;
-  font-family: "Funnel Sans", system-ui, sans-serif;
-  background-color: var(--form-bg);
-  color: var(--form-text);
-  padding: 1rem;
-  border-radius: var(--radius);
+.upload-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: clamp(var(--sp-4), 4vw, var(--sp-8));
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-md);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
 }
 
 .file-upload-wrapper {
@@ -488,96 +1042,131 @@ header p {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 200px;
-  border: 2px dashed var(--color-4);
-  border-radius: var(--radius);
-  background-color: var(--form-bg);
-  cursor: pointer;
-  transition: all var(--transition-speed) ease;
+  gap: var(--sp-2);
+  min-height: 240px;
+  padding: var(--sp-6);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   text-align: center;
-  padding: 1rem;
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
 }
 
-.file-upload-label:hover {
-  border-color: var(--accent-color);
-  background-color: rgba(86, 178, 218, 0.1);
-}
-
+.file-upload-label:hover,
 .file-upload-wrapper.dragover .file-upload-label {
-  border-color: var(--accent-color);
-  background-color: rgba(86, 178, 218, 0.14);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.file-upload-icon-ring {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--sp-2);
+  border-radius: var(--radius-full);
+  background: var(--accent-tint);
+  color: var(--accent-text);
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+.file-upload-label:hover .file-upload-icon-ring {
+  transform: translateY(-2px) scale(1.06);
+}
+
+/* Файл занесён над зоной — иконка «дышит», приглашая отпустить */
+.file-upload-wrapper.dragover .file-upload-icon-ring {
+  animation: ring-pulse 0.9s var(--ease) infinite;
+}
+
+@keyframes ring-pulse {
+  0%,
+  100% {
+    transform: translateY(-2px) scale(1.04);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.16);
+  }
 }
 
 .file-upload-icon {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 10px;
+  width: 26px;
+  height: 26px;
   stroke-width: 2;
-  color: var(--form-text);
-  transition: color var(--transition-speed) ease;
+}
+
+/* Стрелка «взлетает» из подноса при наведении и во время drag-over —
+   иконка сама подсказывает жест */
+.upload-arrow {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.file-upload-label:hover .upload-arrow,
+.file-upload-wrapper.dragover .upload-arrow {
+  animation: arrow-lift 1s var(--ease) infinite;
+}
+
+@keyframes arrow-lift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
 }
 
 .file-upload-label span {
-  font-size: 16px;
-  color: var(--form-text);
-  transition: color var(--transition-speed) ease;
-  font-family: "Funnel Sans", system-ui, sans-serif;
+  font-weight: 600;
+  color: var(--text-1);
 }
 
+.file-upload-hint {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+
+/* Скрыт визуально, но остаётся в tab-порядке (WCAG 2.1.1):
+   display:none выкидывал input из фокуса — выбор файлов без мыши
+   был невозможен. */
 .file-upload-wrapper input[type="file"] {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
 }
 
-.form-actions {
-  text-align: right;
-  margin-top: 1rem;
-}
-
-.submit-button {
-  background: var(--accent-color) !important;
-  color: white !important;
-  width: 100%;
-  border: none;
-  border-radius: var(--radius);
-  padding: 12px 24px;
-  cursor: pointer;
-  transition: all var(--transition-speed) ease;
-  font-weight: bold;
-}
-
-.submit-button:hover:not(:disabled) {
-  background: #4ca0c7 !important;
-  box-shadow: 0 4px 12px rgba(86, 178, 218, 0.3);
-}
-
-.submit-button:active:not(:disabled) {
-  background: #3a8db0 !important;
-  transform: translateY(1px);
-}
-
-.submit-button:disabled {
-  background: var(--disabled-bg) !important;
-  color: var(--disabled-text) !important;
-  cursor: not-allowed;
-  opacity: 0.8;
+.file-upload-wrapper:focus-within .file-upload-label {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .preview-container {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: var(--gap);
-  margin-top: 1rem;
-  padding: 1rem;
-  background-color: var(--form-bg);
-  border-radius: var(--radius);
+  /* UX6: сетка сама подстраивается под ширину экрана */
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--sp-3);
+}
+
+.preview-container:not(:empty) {
+  margin-top: var(--sp-5);
 }
 
 .preview-wrapper {
   position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
   opacity: 0;
-  transform: scale(0.9);
-  transition: all var(--transition-speed) ease;
+  transform: scale(0.85);
+  /* Пружинное появление — карточка чуть «переспрыгивает» финальный размер */
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-3) var(--ease-spring);
 }
 
 .preview-wrapper.loaded {
@@ -585,13 +1174,18 @@ header p {
   transform: scale(1);
 }
 
+/* Удаление превью: сначала плавное схлопывание, затем перерисовка (JS) */
+.preview-wrapper.is-removing {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
 .preview-image {
+  display: block;
   width: 100%;
-  height: 120px;
+  height: 108px;
   object-fit: cover;
-  border-radius: calc(var(--radius) - 2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(86, 178, 218, 0.2);
+  background: var(--surface-2);
 }
 
 .remove-preview {
@@ -599,32 +1193,21 @@ header p {
   bottom: 0;
   left: 0;
   width: 100%;
-  box-sizing: border-box;
-  padding: 5px 10px;
-  border-radius: 0 0 var(--radius) var(--radius);
-  font-size: 14px;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s ease, box-shadow 0.3s ease;
-  text-align: center;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  font-family: "Funnel Sans", system-ui, sans-serif;
+  padding: var(--sp-1);
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  background: rgba(0, 0, 0, 0.45);
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: #fff;
+  font-size: var(--text-md);
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
 }
 
 .remove-preview:hover {
-  background: rgba(200, 50, 60, 0.8);
-  box-shadow: 0 4px 12px rgba(200, 50, 60, 0.2);
-}
-
-.remove-preview:active {
-  background: rgba(180, 40, 50, 0.85);
-  box-shadow: 0 4px 12px rgba(180, 40, 50, 0.3);
+  background: linear-gradient(transparent, rgba(176, 42, 55, 0.9));
 }
 
 .remove-preview:focus-visible {
@@ -632,141 +1215,404 @@ header p {
   outline-offset: -2px;
 }
 
-.no-images-message-icon {
+/* Пофайловый статус пакетной загрузки */
+.preview-wrapper.is-uploading::after,
+.preview-wrapper.is-done::after,
+.preview-wrapper.is-duplicate::after,
+.preview-wrapper.is-error::after {
+  position: absolute;
+  top: var(--sp-1);
+  right: var(--sp-1);
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  background: linear-gradient(90deg, #e5f1f9 0%, #f2f9fd 100%);
-  color: #217ba8;
-  padding: 18px 28px;
-  border-radius: 10px;
-  font-family: "Funnel Sans", system-ui, sans-serif;
-  border-left: 6px solid #56b2da;
-  box-shadow: 0 2px 8px rgba(86, 178, 218, 0.08);
-  max-width: 340px;
-  margin: 32px auto;
-  font-size: 1.1rem;
-  font-weight: 500;
-  position: relative;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  line-height: 1;
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  /* Статус появляется с упругим «выскоком» */
+  animation: badge-pop var(--dur-3) var(--ease-spring);
 }
 
-.no-images-message-icon::before {
-  content: "🖼️";
-  font-size: 2em;
-  margin-right: 8px;
+@keyframes badge-pop {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+  }
+}
+
+.preview-wrapper.is-uploading::after {
+  content: "…";
+  background: rgba(20, 22, 25, 0.75);
+}
+
+.preview-wrapper.is-done::after {
+  content: "✓";
+  background: #2c9576;
+}
+
+.preview-wrapper.is-duplicate::after {
+  content: "=";
+  background: rgba(20, 22, 25, 0.6);
+}
+
+.preview-wrapper.is-error::after {
+  content: "✕";
+  background: var(--danger-solid);
+}
+
+.preview-container.is-busy .remove-preview {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.form-actions {
+  margin-top: var(--sp-5);
+}
+
+.submit-button {
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--cta-bg);
+  color: var(--cta-text);
+  font-weight: 700;
+  font-size: var(--text-md);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease),
+    box-shadow var(--dur-2) var(--ease), opacity var(--dur-1) var(--ease);
+}
+
+.submit-button:hover:not(:disabled) {
+  background: var(--cta-bg-hover);
+  box-shadow: 0 6px 20px var(--accent-tint-strong);
+  transform: translateY(-1px);
+}
+
+.submit-button:active:not(:disabled) {
+  background: var(--cta-bg-active);
+  transform: translateY(1px);
+}
+
+.submit-button:disabled {
+  background: var(--surface-2);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+/* Во время пакетной загрузки в кнопке крутится спиннер рядом с «3 из 10» */
+.submit-button.is-loading::before {
+  content: "";
   display: inline-block;
-  vertical-align: middle;
+  width: 14px;
+  height: 14px;
+  margin-right: var(--sp-2);
+  vertical-align: -2px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
 }
 
-.gallery > .no-images-message-icon {
+/* --------------------------------------------------------------------------
+   10. Уведомления
+   -------------------------------------------------------------------------- */
+
+.page-messages {
+  max-width: 680px;
+  margin-inline: auto;
+  padding-top: var(--sp-4);
+}
+
+.alert {
+  position: relative;
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-3) var(--sp-10) var(--sp-3) var(--sp-4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  color: var(--text-1);
+  font-size: var(--text-sm);
+  max-height: 240px;
+  overflow: hidden;
+  animation: alert-in var(--dur-2) var(--ease-out);
+  transition: opacity var(--dur-3) var(--ease), transform var(--dur-3) var(--ease),
+    max-height var(--dur-3) var(--ease), margin var(--dur-3) var(--ease),
+    padding var(--dur-3) var(--ease), border-width var(--dur-3) var(--ease);
+}
+
+@keyframes alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* U4/UX15: плавное скрытие без резкого сдвига контента */
+.alert.alert-hidden {
+  opacity: 0;
+  transform: translateY(-4px);
+  max-height: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
+}
+
+.alert-close {
+  position: absolute;
+  top: var(--sp-1);
+  right: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity var(--dur-1) var(--ease), transform var(--dur-3) var(--ease-spring);
+}
+
+.alert-close:hover {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+
+/* UX22: success и danger различаются фоном и цветом, а не только рамкой */
+.alert-success,
+.alert-info {
+  border-color: var(--success-border);
+  background: var(--success-tint);
+  color: var(--success-text);
+}
+
+.alert-warning,
+.alert-error,
+.alert-danger {
+  border-color: var(--danger-border);
+  background: var(--danger-tint);
+  color: var(--danger-text);
+}
+
+.alert ul {
+  padding-left: var(--sp-5);
+}
+
+/* --------------------------------------------------------------------------
+   11. Пустое состояние и страницы ошибок
+   -------------------------------------------------------------------------- */
+
+.empty-state {
   column-span: all;
   break-inside: avoid;
-}
-
-.no-image-placeholder {
-  height: 200px;
-  background: #eee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 420px;
+  margin: var(--sp-12) auto;
+  padding: var(--sp-10) var(--sp-8);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
   text-align: center;
-  padding-top: 80px;
-  color: #888;
-  border-radius: var(--radius);
-  font-size: 1.1rem;
-  font-style: italic;
-  font-family: "Funnel Sans", system-ui, sans-serif;
+  animation: fade-up var(--dur-3) var(--ease-out);
 }
 
-@media (max-width: 600px) {
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.empty-state-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--sp-2);
+  border-radius: var(--radius-full);
+  background: var(--accent-tint);
+  color: var(--accent-text);
+  animation: gentle-float 5s ease-in-out infinite;
+}
+
+.empty-state-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* Иконка-картинка «рисуется» штрихом: рамка, затем солнце, затем гора */
+.empty-state-icon rect,
+.empty-state-icon circle,
+.empty-state-icon path {
+  stroke-dasharray: 80;
+  stroke-dashoffset: 80;
+  animation: draw-in 0.9s var(--ease-out) forwards;
+}
+
+.empty-state-icon circle {
+  animation-delay: 0.35s;
+}
+
+.empty-state-icon path {
+  animation-delay: 0.55s;
+}
+
+@keyframes draw-in {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes gentle-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.empty-state-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.empty-state-hint {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+.empty-state-cta {
+  display: inline-block;
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-6);
+  border-radius: var(--radius-full);
+  background: var(--cta-bg);
+  color: var(--cta-text);
+  text-decoration: none;
+  font-weight: 600;
+  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+
+.empty-state-cta:hover {
+  background: var(--cta-bg-hover);
+  transform: translateY(-1px);
+}
+
+.empty-state-cta:active {
+  transform: translateY(1px);
+}
+
+.error-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-block: var(--sp-16);
+}
+
+.error-page .error-code {
+  font-size: clamp(5rem, 16vw, 9rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: var(--tracking-tight);
+  background: linear-gradient(135deg, var(--accent), var(--accent-text));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.error-page h1 {
+  margin-top: var(--sp-4);
+  font-size: var(--text-title);
+  letter-spacing: var(--tracking-tight);
+}
+
+.error-page p {
+  margin-top: var(--sp-2);
+  color: var(--text-2);
+  max-width: 46ch;
+}
+
+.error-home-link {
+  display: inline-block;
+  margin-top: var(--sp-6);
+  padding: var(--sp-2) var(--sp-6);
+  border-radius: var(--radius-full);
+  background: var(--cta-bg);
+  color: var(--cta-text);
+  text-decoration: none;
+  font-weight: 600;
+  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+
+.error-home-link:hover {
+  background: var(--cta-bg-hover);
+  transform: translateY(-1px);
+}
+
+.error-home-link:active {
+  transform: translateY(1px);
+}
+
+/* --------------------------------------------------------------------------
+   12. Футер
+   -------------------------------------------------------------------------- */
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding-block: var(--sp-8);
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Мобильные уточнения
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 700px) {
   :root {
-    --header-offset: 170px;
+    --topbar-h: 56px;
   }
 
-  .upload-toggle {
-    top: 0.75rem;
-    transform: none;
-    position: fixed;
-    z-index: 1100;
-    display: flex;
-    width: 40px;
-    height: 40px;
-    border-radius: 999px;
-    background: rgba(245, 245, 245, 0.88);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+  .brand {
+    font-size: var(--text-md);
   }
 
-  body:not(.light) .upload-toggle {
-    background: rgba(40, 40, 40, 0.72);
-  }
-
-  .theme-toggle {
+  /* Тап-зоны и свайпы заменяют стрелки (C2) */
+  .lightbox-prev,
+  .lightbox-next {
     display: none;
   }
 
-  .upload-toggle {
-    left: auto;
-    right: 0.5rem;
+  .lightbox img {
+    max-width: 100vw;
+    max-height: 92vh;
+    border-radius: 0;
   }
 
-  header {
-    padding-top: 1.2rem;
-    padding-bottom: 1.2rem;
-  }
-
-  header h1 {
-    font-size: 2rem;
-    padding: 0 1.5rem;
-    word-break: break-word;
-  }
-
-  .gallery {
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-
-  .card {
-    margin-bottom: 1rem;
-  }
-
-  .lightbox-prev,
-  .lightbox-next {
-    display: none !important;
-  }
-
-  .lightbox-hint {
-    position: absolute;
-    bottom: 24px;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    color: #fff;
-    font-size: 1rem;
-    opacity: 0.45;
-    pointer-events: none;
-    text-shadow: 0 2px 8px #000;
-    z-index: 1100;
-    transition: opacity 0.4s;
-  }
-}
-
-@media (min-width: 601px) {
-  .lightbox-hint {
-    display: none !important;
-  }
-
-  .lightbox-prev,
-  .lightbox-next {
-    display: flex !important;
-  }
-}
-
-@media (max-width: 600px) {
-  .lightbox-prev,
-  .lightbox-next {
-    display: none !important;
-  }
-
-  .lightbox-hint {
-    display: block;
+  .file-upload-label {
+    min-height: 200px;
   }
 }

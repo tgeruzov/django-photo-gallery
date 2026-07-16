@@ -4,36 +4,38 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.http import HttpResponse, JsonResponse
+from django.db import connections
+from django.db.models import Q
+from django.db.utils import OperationalError
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_GET
 
-from .constants import AJAX_HEADER, AJAX_VALUE
+from .constants import AJAX_VALUE
 from .forms import PhotoUploadForm
 from .image_utils import ImageProcessingError
 from .models import Photo
 from .seo import (
     build_gallery_structured_data,
     build_seo_context,
-    get_photo_label,
+    get_primary_photo_file,
     get_primary_photo_url,
 )
-from .services import save_uploaded_photo
+from .services import DuplicatePhotoError, save_uploaded_photo
 
 logger = logging.getLogger(__name__)
 NOINDEX_ROBOTS = "noindex, nofollow, noarchive"
+FEED_PAGE_SIZE = 12
 
 
 def is_ajax(request):
-    return (
-        request.META.get(AJAX_HEADER) == AJAX_VALUE
-        or request.headers.get("X-Requested-With") == AJAX_VALUE
-    )
+    return request.headers.get("X-Requested-With") == AJAX_VALUE
 
 
 def serialize_photo(photo):
-    display_image = photo.thumbnail or photo.optimized_image or photo.image
+    display_image = photo.display_file
     full_image = photo.optimized_image or photo.image
 
     if not full_image:
@@ -49,22 +51,14 @@ def serialize_photo(photo):
     except ValueError:
         preview_url = full_url
 
-    width = None
-    height = None
-    if display_image:
-        try:
-            width = display_image.width
-            height = display_image.height
-        except (ValueError, FileNotFoundError, OSError):
-            width = None
-            height = None
+    width, height = photo.display_dimensions
 
     return {
         "id": photo.id,
         "url": preview_url,
         "full_url": full_url,
-        "title": photo.title or get_photo_label(photo),
-        "alt_text": get_photo_label(photo),
+        "title": photo.title or photo.display_label,
+        "alt_text": photo.display_label,
         "width": width,
         "height": height,
     }
@@ -92,14 +86,18 @@ def build_index_context(request, photos_page):
         (photo for photo in photos if get_primary_photo_url(request, photo)), None
     )
     featured_image_url = get_primary_photo_url(request, featured_photo) if featured_photo else None
+    featured_image_alt = featured_photo.display_label if featured_photo else None
+    featured_width = featured_height = None
+    if featured_photo:
+        featured_width, featured_height = featured_photo.file_dimensions(
+            get_primary_photo_file(featured_photo)
+        )
 
     context = {
         "photos_page": photos_page,
-        "hero_title": gallery_title,
-        "hero_description": (
-            "Авторская коллекция travel, urban и lifestyle-снимков с акцентом на "
-            "чистую подачу и удобный полноэкранный просмотр."
-        ),
+        # Hero-баннер на главной убран — заголовок остаётся скрытым <h1>
+        # (page_heading) ради валидного outline документа и SEO.
+        "page_heading": gallery_title,
         "seo_structured_data": build_gallery_structured_data(
             request,
             photos,
@@ -113,7 +111,9 @@ def build_index_context(request, photos_page):
             title=gallery_title,
             description=gallery_description,
             image_url=featured_image_url,
-            image_alt=get_photo_label(featured_photo) if featured_photo else None,
+            image_alt=featured_image_alt,
+            image_width=featured_width,
+            image_height=featured_height,
         )
     )
     return context
@@ -122,8 +122,8 @@ def build_index_context(request, photos_page):
 def build_upload_context(request, form):
     context = {
         "form": form,
-        "hero_title": "Загрузка фотографий",
-        "hero_description": "Закрытая страница для пакетной публикации новых снимков в галерею.",
+        "page_heading": "Загрузка фотографий",
+        "max_upload_size_mb": getattr(settings, "MAX_UPLOAD_SIZE_MB", 100),
     }
     context.update(
         build_seo_context(
@@ -131,7 +131,7 @@ def build_upload_context(request, form):
             title="Загрузка фотографий",
             description="Служебная закрытая страница для управления публикацией фотографий.",
             robots=NOINDEX_ROBOTS,
-            canonical_path=reverse("upload_photo"),
+            canonical_path=reverse("gallery:upload_photo"),
         )
     )
     return context
@@ -144,9 +144,42 @@ def render_upload_page(request, form, *, status=200):
     return with_x_robots_tag(response, NOINDEX_ROBOTS)
 
 
+def feed_after_response(request, photos_list, after):
+    """P8: keyset-пагинация ленты по (uploaded_at, id) вместо OFFSET."""
+    try:
+        cursor = Photo.objects.only("uploaded_at").get(pk=int(after))
+    except (TypeError, ValueError, Photo.DoesNotExist):
+        return with_x_robots_tag(
+            JsonResponse({"photos": [], "has_next": False}),
+            NOINDEX_ROBOTS,
+        )
+
+    window = list(
+        photos_list.filter(
+            Q(uploaded_at__lt=cursor.uploaded_at)
+            | Q(uploaded_at=cursor.uploaded_at, id__lt=cursor.id)
+        )[: FEED_PAGE_SIZE + 1]
+    )
+    has_next = len(window) > FEED_PAGE_SIZE
+    photos_data = []
+    for photo in window[:FEED_PAGE_SIZE]:
+        serialized = serialize_photo(photo)
+        if serialized:
+            photos_data.append(serialized)
+    return with_x_robots_tag(
+        JsonResponse({"photos": photos_data, "has_next": has_next}),
+        NOINDEX_ROBOTS,
+    )
+
+
 def index(request):
-    photos_list = Photo.objects.all().order_by("-uploaded_at")
-    paginator = Paginator(photos_list, 12)
+    # Явный tie-break по id — обязателен для корректного keyset-курсора
+    photos_list = Photo.objects.all().order_by("-uploaded_at", "-id")
+
+    if is_ajax(request) and request.GET.get("after") is not None:
+        return feed_after_response(request, photos_list, request.GET.get("after"))
+
+    paginator = Paginator(photos_list, FEED_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
 
     try:
@@ -159,7 +192,9 @@ def index(request):
                 JsonResponse({"photos": [], "has_next": False}),
                 NOINDEX_ROBOTS,
             )
-        photos_page = paginator.page(paginator.num_pages)
+        # B14: молчаливая отдача последней страницы плодила бесконечные
+        # URL-дубликаты со статусом 200 для краулеров.
+        raise Http404("Страница вне диапазона") from None
 
     if is_ajax(request):
         photos_data = []
@@ -202,17 +237,21 @@ def upload_photo(request):
                     ),
                     NOINDEX_ROBOTS,
                 )
-            messages.error(request, "Исправьте ошибки формы и попробуйте снова.")
+            # H9: без дублирующего message — детали уже выводит form.errors
             return render_upload_page(request, form, status=400)
 
         files = form.cleaned_data.get("files", [])
         uploaded_count = 0
         errors = []
+        duplicates = []
 
         for file in files:
             try:
                 save_uploaded_photo(file)
                 uploaded_count += 1
+            except DuplicatePhotoError as exc:
+                logger.info("Пропущен дубликат %s: %s", file.name, exc)
+                duplicates.append(f"{file.name}: {exc}")
             except ImageProcessingError as exc:
                 logger.warning("Ошибка обработки %s: %s", file.name, exc)
                 errors.append(f"{file.name}: {exc}")
@@ -220,7 +259,7 @@ def upload_photo(request):
                 logger.exception("Непредвиденная ошибка обработки %s: %s", file.name, exc)
                 errors.append(f"{file.name}: внутренняя ошибка обработки")
 
-        if uploaded_count == 0:
+        if uploaded_count == 0 and errors:
             if is_ajax(request):
                 return with_x_robots_tag(
                     JsonResponse(
@@ -228,6 +267,7 @@ def upload_photo(request):
                             "success": False,
                             "error": "Не удалось загрузить ни одного файла",
                             "errors": errors,
+                            "duplicates": duplicates,
                         },
                         status=400,
                     ),
@@ -236,9 +276,11 @@ def upload_photo(request):
             messages.error(request, "Не удалось загрузить ни одного фото.")
             for error in errors:
                 messages.error(request, error)
-            return render_upload_page(request, PhotoUploadForm(), status=400)
+            return render_upload_page(request, form, status=400)
 
-        msg = f"Загружено {uploaded_count} фото"
+        msg = f"Загружено {uploaded_count} фото" if uploaded_count else "Новых фото нет"
+        if duplicates:
+            msg += f" (пропущено дубликатов: {len(duplicates)})"
         if errors:
             msg += f" (с ошибками: {len(errors)})"
 
@@ -247,9 +289,10 @@ def upload_photo(request):
                 JsonResponse(
                     {
                         "success": True,
-                        "redirect_url": reverse("index"),
+                        "redirect_url": reverse("gallery:index"),
                         "message": msg,
                         "errors": errors,
+                        "duplicates": duplicates,
                     }
                 ),
                 NOINDEX_ROBOTS,
@@ -261,15 +304,18 @@ def upload_photo(request):
                 messages.warning(request, error)
         else:
             messages.success(request, msg)
-        return redirect(reverse("index"))
+        for duplicate in duplicates:
+            messages.info(request, duplicate)
+        return redirect(reverse("gallery:index"))
 
     return render_upload_page(request, form)
 
 
 @require_GET
+@cache_page(60)
 def all_photos_json(request):
     photos = Photo.objects.all().order_by("-uploaded_at")
-    max_page_size = max(1, int(getattr(settings, "MAX_JSON_PAGE_SIZE", 200)))
+    max_page_size = max(1, getattr(settings, "MAX_JSON_PAGE_SIZE", 200))
 
     try:
         page_size = int(request.GET.get("page_size", max_page_size))
@@ -319,6 +365,17 @@ def all_photos_json(request):
 
 
 @require_GET
+def healthz(request):
+    """Проверка живости для контейнерных healthcheck-ов: приложение + БД."""
+    try:
+        connections["default"].cursor()
+    except OperationalError:
+        return with_x_robots_tag(JsonResponse({"status": "error"}, status=503), NOINDEX_ROBOTS)
+    return with_x_robots_tag(JsonResponse({"status": "ok"}), NOINDEX_ROBOTS)
+
+
+@require_GET
+@cache_page(60)
 def robots_txt(request):
     lines = [
         "User-agent: *",

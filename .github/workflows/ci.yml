@@ -24,7 +24,7 @@ jobs:
           --health-retries=20
 
     env:
-      DJANGO_ENV: "dev"
+      DJANGO_ENV: "test"
       DEBUG: "1"
       SECRET_KEY: "ci-secret-key"
       ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
@@ -51,8 +51,23 @@ jobs:
       - name: Run lint and formatting checks
         run: pre-commit run --all-files --show-diff-on-failure
 
+      - name: Audit dependencies
+        run: pipx run pip-audit -r requirements.txt
+
+      - name: Check production configuration
+        env:
+          DJANGO_ENV: "prod"
+          DEBUG: "0"
+          # Полностью «зелёная» prod-конфигурация для --fail-level WARNING
+          SECURE_HSTS_SECONDS: "31536000"
+          SECURE_HSTS_PRELOAD: "1"
+        run: |
+          SECRET_KEY=$(openssl rand -hex 32) python manage.py check --deploy --fail-level WARNING
+
       - name: Run migrations
         run: python manage.py migrate
 
-      - name: Run tests
-        run: python manage.py test
+      - name: Run tests with coverage
+        run: |
+          coverage run manage.py test
+          coverage report --fail-under=75

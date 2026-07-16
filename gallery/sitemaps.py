@@ -9,7 +9,7 @@ class RootSitemap(Sitemap):
     priority = 1.0
 
     def items(self):
-        return ["index"]
+        return ["gallery:index"]
 
     def location(self, item):
         return reverse(item)

@@ -1,6 +1,11 @@
+import contextlib
 import json
+import mimetypes
 
 from django.conf import settings
+
+# Python < 3.13 не знает webp из коробки
+mimetypes.add_type("image/webp", ".webp")
 
 
 def get_site_name():
@@ -23,11 +28,11 @@ def get_site_locale():
 
 
 def build_absolute_url(request, path=None):
-    return request.build_absolute_uri(path or request.path)
-
-
-def get_photo_label(photo):
-    return photo.alt_text or photo.title or (f"Фотография {photo.pk}" if photo.pk else "Фотография")
+    # Без path сохраняем query string (?page=N): страницы пагинации
+    # объявляют self-canonical, а не копию главной (SE1).
+    if path:
+        return request.build_absolute_uri(path)
+    return request.build_absolute_uri()
 
 
 def get_primary_photo_file(photo):
@@ -53,14 +58,13 @@ def build_seo_context(
     canonical_path=None,
     image_url=None,
     image_alt=None,
+    image_width=None,
+    image_height=None,
     og_type="website",
 ):
     site_name = get_site_name()
     clean_title = (title or site_name).strip()
-    if clean_title == site_name:
-        seo_title = site_name
-    else:
-        seo_title = f"{clean_title} | {site_name}"
+    seo_title = site_name if clean_title == site_name else f"{clean_title} | {site_name}"
 
     return {
         "seo_title": seo_title,
@@ -73,6 +77,9 @@ def build_seo_context(
         "seo_twitter_card": "summary_large_image" if image_url else "summary",
         "seo_image_url": image_url,
         "seo_image_alt": image_alt,
+        "seo_image_width": image_width,
+        "seo_image_height": image_height,
+        "seo_image_type": mimetypes.guess_type(image_url)[0] if image_url else None,
     }
 
 
@@ -97,16 +104,28 @@ def build_gallery_structured_data(request, photos, *, title, description):
         image_object = {
             "@type": "ImageObject",
             "contentUrl": image_url,
-            "name": photo.title or get_photo_label(photo),
-            "description": get_photo_label(photo),
+            "name": photo.title or photo.display_label,
+            "description": photo.display_label,
         }
 
         image_file = get_primary_photo_file(photo)
-        try:
-            image_object["width"] = image_file.width
-            image_object["height"] = image_file.height
-        except (AttributeError, FileNotFoundError, OSError, ValueError):
-            pass
+        width, height = photo.file_dimensions(image_file)
+        if width and height:
+            image_object["width"] = width
+            image_object["height"] = height
+
+        # SE3: авторство и лицензирование — «паспорт» фото для Google Images
+        site_name = get_site_name()
+        image_object.update(
+            {
+                "creator": {"@type": "Person", "name": site_name},
+                "copyrightNotice": f"© {site_name}",
+                "creditText": site_name,
+            }
+        )
+        if photo.thumbnail:
+            with contextlib.suppress(ValueError):
+                image_object["thumbnailUrl"] = request.build_absolute_uri(photo.thumbnail.url)
 
         image_objects.append(image_object)
 
@@ -122,10 +141,13 @@ def build_gallery_structured_data(request, photos, *, title, description):
             }
         )
 
-    return json.dumps(
+    payload = json.dumps(
         {
             "@context": "https://schema.org",
             "@graph": graph,
         },
         ensure_ascii=False,
     )
+    # json.dumps не экранирует "</" — без замены строка "</script>" в title/alt_text
+    # закрыла бы JSON-LD-блок и исполнилась как HTML (stored XSS).
+    return payload.replace("</", "<\\/")

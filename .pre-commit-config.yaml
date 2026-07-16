@@ -4,6 +4,9 @@ repos:
     hooks:
       - id: check-added-large-files
       - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: detect-private-key
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
@@ -12,8 +15,4 @@ repos:
     hooks:
       - id: ruff
         args: ["--fix"]
-
-  - repo: https://github.com/psf/black
-    rev: 24.8.0
-    hooks:
-      - id: black
+      - id: ruff-format

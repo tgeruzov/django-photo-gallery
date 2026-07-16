@@ -6,9 +6,10 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 
 from gallery.sitemaps import sitemaps
-from gallery.views import robots_txt
+from gallery.views import healthz, robots_txt
 
 urlpatterns = [
+    path("healthz", healthz, name="healthz"),
     path("robots.txt", robots_txt, name="robots_txt"),
     path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="sitemap"),
     path(

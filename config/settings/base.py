@@ -78,17 +78,27 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "gallery"),
-        "USER": os.environ.get("DB_USER", "gallery"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "gallery"),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
-        "CONN_MAX_AGE": env_int("DB_CONN_MAX_AGE", 60),
+# Postgres по умолчанию (docker/CI); sqlite — для площадок без своего
+# сервера БД, например виртуального хостинга.
+if os.environ.get("DB_ENGINE", "postgresql").strip().lower() == "sqlite":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.environ.get("DB_NAME") or str(BASE_DIR / "db.sqlite3"),
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("DB_NAME", "gallery"),
+            "USER": os.environ.get("DB_USER", "gallery"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "gallery"),
+            "HOST": os.environ.get("DB_HOST", "localhost"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+            "CONN_MAX_AGE": env_int("DB_CONN_MAX_AGE", 60),
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -105,10 +115,18 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Безопасный дефолт без внешних сервисов; prod переопределяет на Redis
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SITE_NAME = os.environ.get("SITE_NAME", "Timur Geruzov")
@@ -136,6 +154,12 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BEAT_SCHEDULE = {
+    "backfill-missing-derivatives": {
+        "task": "gallery.tasks.backfill_missing_derivatives",
+        "schedule": 900,  # каждые 15 минут
+    },
+}
 
 LOGGING = {
     "version": 1,

@@ -1,8 +1,8 @@
-Django==3.2.25
-python-dotenv==1.1.0
+Django==5.2.16
+python-dotenv==1.2.2
 psycopg2-binary==2.9.9
-pillow==9.5.0
+pillow==12.3.0
 whitenoise==6.9.0
 django-cleanup==9.0.0
-gunicorn==21.2.0
+gunicorn==23.0.0
 celery[redis]==5.4.0
