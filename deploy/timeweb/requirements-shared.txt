@@ -1,0 +1,12 @@
+# Зависимости для shared-хостинга Timeweb (Apache + mod_wsgi, MySQL).
+# Ставится на сервере отдельно от requirements.txt: без gunicorn, Celery,
+# whitenoise и psycopg2 — они на этом тарифе не нужны.
+Django==5.2.16
+python-dotenv==1.2.2
+pillow==12.3.0
+django-cleanup==9.0.0
+mysqlclient==2.2.4
+# celery импортируется при старте (config/celery.py). Воркер/брокер не
+# запускаются (ENABLE_BACKGROUND_TASKS=0 → превью генерируются синхронно),
+# но пакет должен быть установлен, чтобы приложение поднялось.
+celery==5.4.0

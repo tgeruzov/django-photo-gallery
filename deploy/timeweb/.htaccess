@@ -1,0 +1,15 @@
+Options -Indexes +ExecCGI
+AddHandler wsgi-script .py
+DirectoryIndex wsgi.py
+
+RewriteEngine On
+RewriteRule ^$ /wsgi.py [QSA,PT,L]
+
+# Собранная статика лежит в STATIC_ROOT (staticfiles/), а URL остаётся /static/.
+RewriteRule ^static/(.*)$ /staticfiles/$1 [L]
+
+# Всё, что не существует на диске как файл/каталог (в т.ч. существующие файлы
+# в media/ отдаёт Apache напрямую), направляем в Django.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ /wsgi.py/$1 [QSA,PT,L]
