@@ -1,4 +1,4 @@
-Django==5.2.16
+Django==5.2.17
 python-dotenv==1.2.2
 psycopg2-binary==2.9.9
 pillow==12.3.0
