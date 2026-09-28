@@ -10,6 +10,8 @@ from django.db.utils import OperationalError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_GET
 
@@ -55,6 +57,7 @@ def serialize_photo(photo):
 
     return {
         "id": photo.id,
+        "uploaded_at": photo.uploaded_at.isoformat(),
         "url": preview_url,
         "full_url": full_url,
         "title": photo.title or photo.display_label,
@@ -62,6 +65,10 @@ def serialize_photo(photo):
         "width": width,
         "height": height,
     }
+
+
+def serialize_photos(photos):
+    return [data for data in map(serialize_photo, photos) if data]
 
 
 def with_x_robots_tag(response, value):
@@ -144,30 +151,50 @@ def render_upload_page(request, form, *, status=200):
     return with_x_robots_tag(response, NOINDEX_ROBOTS)
 
 
-def feed_after_response(request, photos_list, after):
-    """P8: keyset-пагинация ленты по (uploaded_at, id) вместо OFFSET."""
+def resolve_feed_cursor(after, after_ts):
+    """Позиция курсора (uploaded_at, id) или None, если её не восстановить.
+
+    Время берётся из запроса: курсор не ломается, если фото, от которого
+    листали, успели удалить. Поиск по pk - фолбэк для старых клиентов.
+    """
     try:
-        cursor = Photo.objects.only("uploaded_at").get(pk=int(after))
-    except (TypeError, ValueError, Photo.DoesNotExist):
+        cursor_id = int(after)
+    except (TypeError, ValueError):
+        return None
+
+    cursor_ts = None
+    if after_ts:
+        try:
+            cursor_ts = parse_datetime(after_ts)
+        except ValueError:
+            cursor_ts = None
+    if cursor_ts is not None and timezone.is_naive(cursor_ts):
+        cursor_ts = None
+    if cursor_ts is not None:
+        return cursor_ts, cursor_id
+
+    cursor = Photo.objects.filter(pk=cursor_id).values_list("uploaded_at", flat=True).first()
+    return (cursor, cursor_id) if cursor else None
+
+
+def feed_after_response(request, photos_list, after, after_ts=None):
+    """P8: keyset-пагинация ленты по (uploaded_at, id) вместо OFFSET."""
+    position = resolve_feed_cursor(after, after_ts)
+    if position is None:
         return with_x_robots_tag(
             JsonResponse({"photos": [], "has_next": False}),
             NOINDEX_ROBOTS,
         )
+    cursor_ts, cursor_id = position
 
     window = list(
         photos_list.filter(
-            Q(uploaded_at__lt=cursor.uploaded_at)
-            | Q(uploaded_at=cursor.uploaded_at, id__lt=cursor.id)
+            Q(uploaded_at__lt=cursor_ts) | Q(uploaded_at=cursor_ts, id__lt=cursor_id)
         )[: FEED_PAGE_SIZE + 1]
     )
     has_next = len(window) > FEED_PAGE_SIZE
-    photos_data = []
-    for photo in window[:FEED_PAGE_SIZE]:
-        serialized = serialize_photo(photo)
-        if serialized:
-            photos_data.append(serialized)
     return with_x_robots_tag(
-        JsonResponse({"photos": photos_data, "has_next": has_next}),
+        JsonResponse({"photos": serialize_photos(window[:FEED_PAGE_SIZE]), "has_next": has_next}),
         NOINDEX_ROBOTS,
     )
 
@@ -177,7 +204,9 @@ def index(request):
     photos_list = Photo.objects.all().order_by("-uploaded_at", "-id")
 
     if is_ajax(request) and request.GET.get("after") is not None:
-        return feed_after_response(request, photos_list, request.GET.get("after"))
+        return feed_after_response(
+            request, photos_list, request.GET.get("after"), request.GET.get("after_ts")
+        )
 
     paginator = Paginator(photos_list, FEED_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
@@ -197,15 +226,10 @@ def index(request):
         raise Http404("Страница вне диапазона") from None
 
     if is_ajax(request):
-        photos_data = []
-        for photo in photos_page:
-            serialized = serialize_photo(photo)
-            if serialized:
-                photos_data.append(serialized)
         return with_x_robots_tag(
             JsonResponse(
                 {
-                    "photos": photos_data,
+                    "photos": serialize_photos(photos_page),
                     "has_next": photos_page.has_next(),
                     "page": photos_page.number,
                 }
@@ -314,7 +338,8 @@ def upload_photo(request):
 @require_GET
 @cache_page(60)
 def all_photos_json(request):
-    photos = Photo.objects.all().order_by("-uploaded_at")
+    # tie-break по id: без него фото с одинаковым временем прыгают между страницами
+    photos = Photo.objects.all().order_by("-uploaded_at", "-id")
     max_page_size = max(1, getattr(settings, "MAX_JSON_PAGE_SIZE", 200))
 
     try:
@@ -344,16 +369,10 @@ def all_photos_json(request):
             NOINDEX_ROBOTS,
         )
 
-    data = []
-    for photo in photos_page:
-        serialized = serialize_photo(photo)
-        if serialized:
-            data.append(serialized)
-
     return with_x_robots_tag(
         JsonResponse(
             {
-                "photos": data,
+                "photos": serialize_photos(photos_page),
                 "page": photos_page.number,
                 "page_size": page_size,
                 "has_next": photos_page.has_next(),

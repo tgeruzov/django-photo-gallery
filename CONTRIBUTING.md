@@ -77,7 +77,7 @@ Before opening a PR, run:
 ```bash
 pre-commit run --all-files
 python manage.py check
-python manage.py test
+DJANGO_ENV=test python manage.py test
 ```
 
 If you work through Docker, run the Django commands inside the web container.

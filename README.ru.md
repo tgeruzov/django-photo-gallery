@@ -13,18 +13,6 @@
 </p>
 
 <p align="center">
-  <a href="https://tgeruzov.ru/"><strong>Рабочий пример</strong></a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/tgeruzov/django-photo-gallery/blob/deploy/timeweb-shared/docs/timeweb-deploy.md"><strong>Гайд по деплою на Timeweb shared hosting</strong></a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/tgeruzov/django-photo-gallery/blob/deploy/timeweb-shared/docs/timeweb-deploy.ru.md"><strong>Гайд по деплою на Timeweb shared hosting (RU)</strong></a>
-</p>
-
-<p align="center">
   <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
     <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
   </a>
@@ -164,11 +152,14 @@ source .venv/bin/activate
 ```
 
 ```bash
+cp .env.example .env         # DJANGO_ENV=dev; без локального PostgreSQL поставь DB_ENGINE=sqlite
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
+
+Без `DJANGO_ENV` проект стартует в режиме `prod` и не поднимется без сильного `SECRET_KEY`: забытое окружение на сервере падает сразу, а не работает с `DEBUG=True`.
 
 ### Production-like прогон
 
@@ -203,6 +194,7 @@ docker compose -f docker-compose.prod.yml up --build
   "photos": [
     {
       "id": 1,
+      "uploaded_at": "2026-02-25T18:04:12.345678+00:00",
       "url": "/media/thumbnails/2026/02/25/image.webp",
       "full_url": "/media/optimized/2026/02/25/image.webp",
       "title": "My photo"
@@ -239,7 +231,7 @@ pip install -r requirements-dev.txt
 pre-commit install
 pre-commit run --all-files
 python manage.py check
-python manage.py test
+DJANGO_ENV=test python manage.py test
 ```
 
 GitHub Actions тоже запускает линтинг, миграции и тесты на `push` и `pull_request`.
@@ -253,7 +245,8 @@ GitHub Actions тоже запускает линтинг, миграции и �
 django-photo-gallery/
 ├── config/                  # Django config, split settings, Celery wiring
 ├── docs/                    # README assets
-├── gallery/                 # Models, views, services, forms, tests
+├── deploy/                  # nginx config for the prod compose profile
+├── gallery/                 # Models, views, services, forms, tests/
 ├── static/                  # CSS, JS, icons
 ├── .github/workflows/       # CI pipeline
 ├── docker-compose.yml
@@ -271,11 +264,11 @@ django-photo-gallery/
 
 - Установить `DJANGO_ENV=prod`
 - Установить `DEBUG=0`
-- Использовать сильный случайный `SECRET_KEY`
+- Использовать сильный случайный `SECRET_KEY` и недефолтный `DB_PASSWORD`
 - Жёстко настроить `ALLOWED_HOSTS`
 - Настроить `CSRF_TRUSTED_ORIGINS`
 - Выполнить `python manage.py collectstatic --noinput`
-- Запустить Redis и Celery worker
+- Запустить Redis и Celery worker (без них повесить `python manage.py generate_derivatives` на cron, чтобы доделывать недостающие превью)
 - Держать резервные копии `media/`
 - Включить HTTPS redirect в реальном продакшене
 

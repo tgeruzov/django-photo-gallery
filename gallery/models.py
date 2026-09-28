@@ -39,9 +39,10 @@ class Photo(models.Model):
     class Meta:
         verbose_name = "Фотография"
         verbose_name_plural = "Фотографии"
-        ordering = ["-uploaded_at"]
+        ordering = ["-uploaded_at", "-id"]
         indexes = [
-            models.Index(fields=["-uploaded_at"], name="gallery_photo_up_idx"),
+            # Совпадает с сортировкой ленты и keyset-курсором (uploaded_at, id)
+            models.Index(fields=["-uploaded_at", "-id"], name="gallery_photo_up_id_idx"),
         ]
 
     def __str__(self):
@@ -50,10 +51,6 @@ class Photo(models.Model):
         if self.image:
             return self.image.name
         return f"Photo #{self.pk or 'new'}"
-
-    @property
-    def has_complete_variants(self):
-        return bool(self.optimized_image and self.thumbnail)
 
     def file_dimensions(self, file_field):
         """Размеры файла: из колонок БД, для оригинала — осторожно с диска."""

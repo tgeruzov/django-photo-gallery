@@ -13,18 +13,6 @@
 </p>
 
 <p align="center">
-  <a href="https://tgeruzov.ru/"><strong>Live example</strong></a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/tgeruzov/django-photo-gallery/blob/deploy/timeweb-shared/docs/timeweb-deploy.md"><strong>Timeweb shared-hosting deployment guide</strong></a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/tgeruzov/django-photo-gallery/blob/deploy/timeweb-shared/docs/timeweb-deploy.ru.md"><strong>Timeweb shared-hosting deployment guide (RU)</strong></a>
-</p>
-
-<p align="center">
   <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
     <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
   </a>
@@ -158,11 +146,14 @@ source .venv/bin/activate
 ```
 
 ```bash
+cp .env.example .env         # DJANGO_ENV=dev; set DB_ENGINE=sqlite if you have no local PostgreSQL
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
+
+Without `DJANGO_ENV` the project starts in `prod` mode and refuses to boot without a strong `SECRET_KEY`, so a forgotten environment on a server fails loudly instead of running with `DEBUG=True`.
 
 ### Production-like rehearsal
 
@@ -197,6 +188,7 @@ For localhost smoke tests this profile keeps `SECURE_SSL_REDIRECT=0`, so it stay
   "photos": [
     {
       "id": 1,
+      "uploaded_at": "2026-02-25T18:04:12.345678+00:00",
       "url": "/media/thumbnails/2026/02/25/image.webp",
       "full_url": "/media/optimized/2026/02/25/image.webp",
       "title": "My photo"
@@ -231,7 +223,7 @@ pip install -r requirements-dev.txt
 pre-commit install
 pre-commit run --all-files
 python manage.py check
-python manage.py test
+DJANGO_ENV=test python manage.py test
 ```
 
 GitHub Actions also runs linting, migrations, and tests on `push` and `pull_request`.
@@ -245,7 +237,8 @@ GitHub Actions also runs linting, migrations, and tests on `push` and `pull_requ
 django-photo-gallery/
 ├── config/                  # Django config, split settings, Celery wiring
 ├── docs/                    # README assets
-├── gallery/                 # Models, views, services, forms, tests
+├── deploy/                  # nginx config for the prod compose profile
+├── gallery/                 # Models, views, services, forms, tests/
 ├── static/                  # CSS, JS, icons
 ├── .github/workflows/       # CI pipeline
 ├── docker-compose.yml
@@ -263,11 +256,11 @@ django-photo-gallery/
 
 - Set `DJANGO_ENV=prod`
 - Set `DEBUG=0`
-- Use a strong random `SECRET_KEY`
+- Use a strong random `SECRET_KEY` and a non-default `DB_PASSWORD`
 - Configure strict `ALLOWED_HOSTS`
 - Configure `CSRF_TRUSTED_ORIGINS`
 - Run `python manage.py collectstatic --noinput`
-- Run Redis and a Celery worker
+- Run Redis and a Celery worker (without them, schedule `python manage.py generate_derivatives` via cron to backfill missing previews)
 - Keep `media/` backed up
 - Enable HTTPS redirects in real production
 

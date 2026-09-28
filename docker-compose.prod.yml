@@ -11,7 +11,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-gallery}
       POSTGRES_USER: ${DB_USER:-gallery}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-gallery}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,7 +32,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-gallery}
       POSTGRES_USER: ${DB_USER:-gallery}
-      PGPASSWORD: ${DB_PASSWORD:-gallery}
+      PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     volumes:
       - ./backups:/backups
     depends_on:
@@ -76,10 +76,7 @@ services:
 
   web:
     build: .
-    command: >
-      sh -c "gunicorn config.wsgi:application --bind 0.0.0.0:8000
-             --workers $${GUNICORN_WORKERS:-3} --timeout 120
-             --max-requests 500 --max-requests-jitter 50 --access-logfile -"
+    # Команда запуска gunicorn - CMD из Dockerfile
     env_file: .env
     volumes:
       - static_data:/app/staticfiles

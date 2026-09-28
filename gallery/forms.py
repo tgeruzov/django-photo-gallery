@@ -32,7 +32,7 @@ class MultipleFileField(forms.FileField):
 
 
 def validate_file_size(uploaded_file):
-    """Проверяет размер файла - максимум 100МБ"""
+    """Проверяет размер файла по MAX_UPLOAD_SIZE_MB."""
     limit_mb = getattr(settings, "MAX_UPLOAD_SIZE_MB", 100)
     limit_bytes = limit_mb * 1024 * 1024
     if uploaded_file.size > limit_bytes:
