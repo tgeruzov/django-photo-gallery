@@ -640,9 +640,14 @@ function setupInfiniteScroll(gallery, cardRevealer) {
 
     // Keyset-курсор от последней карточки (P8); page — фолбэк,
     // если карточек с id нет.
+    // data-ts передаётся вместе с id, чтобы курсор пережил удаление этого фото.
     const cards = gallery.querySelectorAll('.card[data-id]');
-    const lastId = cards.length ? cards[cards.length - 1].dataset.id : null;
-    const params = lastId ? { after: lastId } : { page: nextPage };
+    const lastCard = cards.length ? cards[cards.length - 1] : null;
+    let params = { page: nextPage };
+    if (lastCard) {
+      params = { after: lastCard.dataset.id };
+      if (lastCard.dataset.ts) params.after_ts = lastCard.dataset.ts;
+    }
 
     try {
       const response = await fetch(buildUrlWithQuery(window.location.href, params), {
@@ -1152,6 +1157,9 @@ function createGalleryCard(photo) {
   card.className = 'card';
   if (photo.id !== undefined && photo.id !== null) {
     card.dataset.id = String(photo.id);
+  }
+  if (photo.uploaded_at) {
+    card.dataset.ts = String(photo.uploaded_at);
   }
   card.setAttribute('aria-label', `Открыть фото: ${photoLabel}`);
 

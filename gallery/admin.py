@@ -18,7 +18,7 @@ class PhotoAdmin(admin.ModelAdmin):
     )
     date_hierarchy = "uploaded_at"
     search_fields = ("title", "alt_text", "image", "optimized_image", "thumbnail")
-    ordering = ("-uploaded_at",)
+    ordering = ("-uploaded_at", "-id")
     readonly_fields = ("uploaded_at", "preview")
     actions = ("generate_missing_derivatives",)
 

@@ -52,12 +52,13 @@ jobs:
         run: pre-commit run --all-files --show-diff-on-failure
 
       - name: Audit dependencies
-        run: pipx run pip-audit -r requirements.txt
+        run: pipx run pip-audit -r requirements-dev.txt
 
       - name: Check production configuration
         env:
           DJANGO_ENV: "prod"
           DEBUG: "0"
+          DB_PASSWORD: "ci-deploy-check"
           # Полностью «зелёная» prod-конфигурация для --fail-level WARNING
           SECURE_HSTS_SECONDS: "31536000"
           SECURE_HSTS_PRELOAD: "1"

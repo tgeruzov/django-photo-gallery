@@ -10,7 +10,17 @@ if (
     or SECRET_KEY == "dev-key-change-in-production"  # noqa: S105 — это dev-дефолт, не секрет
     or len(SECRET_KEY) < 50
 ):
-    raise ImproperlyConfigured("SECRET_KEY must be set to a strong unique value in production.")
+    raise ImproperlyConfigured(
+        "SECRET_KEY must be set to a strong unique value in production "
+        "(for local development set DJANGO_ENV=dev)."
+    )
+
+# Дефолтный пароль из base годится только для локальной БД
+if DATABASES["default"]["ENGINE"].endswith("postgresql") and os.environ.get("DB_PASSWORD", "") in {
+    "",
+    "gallery",
+}:
+    raise ImproperlyConfigured("DB_PASSWORD must be set to a non-default value in production.")
 
 DEBUG = env_bool("DEBUG", False)
 

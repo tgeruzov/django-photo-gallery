@@ -1,6 +1,5 @@
 # Настройки изображений
 AJAX_VALUE = "XMLHttpRequest"
-ACCEPT_JSON = "application/json"
 
 # Размеры для миниатюр
 THUMBNAIL_SIZE = (800, 800)
@@ -9,7 +8,6 @@ THUMBNAIL_FORMAT = "WEBP"
 
 # Разрешенные форматы
 ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
-DEFAULT_IMAGE_EXTENSION = ".jpg"
 
 # Для оптимизации больших фото
 OPTIMIZED_IMAGE_SIZE = (2560, 2560)

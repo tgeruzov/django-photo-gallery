@@ -67,17 +67,6 @@ def open_image_from_file(file_obj: BinaryIO) -> Image.Image:
     return normalize_image_mode(img)
 
 
-def open_image_from_path(image_path: str) -> Image.Image:
-    """Читает изображение с диска с EXIF-поворотом и нормализацией."""
-    try:
-        with open(image_path, "rb") as fh:
-            img = _open_image(fh)
-    except FileNotFoundError as exc:
-        raise ImageProcessingError("Файл не найден.") from exc
-    img = fix_image_rotation(img)
-    return normalize_image_mode(img)
-
-
 def make_image_variant_buffer(
     img: Image.Image, size: tuple[int, int], quality: int, fmt: str
 ) -> tuple[BytesIO, tuple[int, int]]:

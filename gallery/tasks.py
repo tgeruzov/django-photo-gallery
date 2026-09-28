@@ -2,11 +2,10 @@ import logging
 
 from celery import shared_task
 from django.conf import settings
-from django.db.models import Q
 from django.db.utils import OperationalError
 
 from .image_utils import ImageProcessingError
-from .services import ensure_photo_derivatives_by_id
+from .services import ensure_photo_derivatives_by_id, photos_missing_derivatives
 
 logger = logging.getLogger(__name__)
 
@@ -33,13 +32,7 @@ def backfill_missing_derivatives():
     исчерпаны), фото остаётся без вариантов. Beat-расписание добирает такие
     записи пачками.
     """
-    from .models import Photo
-
-    photo_ids = list(
-        Photo.objects.filter(Q(optimized_image="") | Q(thumbnail=""))
-        .exclude(image="", optimized_image="")
-        .values_list("id", flat=True)[:100]
-    )
+    photo_ids = list(photos_missing_derivatives().values_list("id", flat=True)[:100])
     for photo_id in photo_ids:
         ensure_photo_derivatives_task.delay(photo_id)
     return len(photo_ids)
@@ -63,8 +56,3 @@ def schedule_photo_derivatives(photo_id):
         return "failed"
 
     return "processed" if updated else "skipped"
-
-
-def create_thumbnail_for_photo(photo_id):
-    """Backward-compatible wrapper retained for older imports."""
-    return ensure_photo_derivatives_by_id(photo_id)

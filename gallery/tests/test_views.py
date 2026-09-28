@@ -1,249 +1,10 @@
-import shutil
-import tempfile
-from io import BytesIO
-from pathlib import Path
-from unittest.mock import patch
-
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
 from django.urls import reverse
-from PIL import Image
 
-from .forms import validate_file_size, validate_image_type
-from .image_utils import (
-    ImageProcessingError,
-    build_thumbnail_content,
-    open_image_from_file,
-)
-from .models import Photo
-from .services import (
-    DuplicatePhotoError,
-    ensure_photo_derivatives_by_id,
-    save_uploaded_photo,
-)
-from .tasks import schedule_photo_derivatives
+from gallery.models import Photo
 
-
-def build_test_image(filename="test.png", size=(64, 64), color=(255, 0, 0)):
-    stream = BytesIO()
-    Image.new("RGB", size, color).save(stream, format="PNG")
-    return SimpleUploadedFile(filename, stream.getvalue(), content_type="image/png")
-
-
-class GalleryTestCase(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls._temp_media_root = tempfile.mkdtemp(prefix="gallery-test-media-")
-        cls._settings_override = override_settings(
-            MEDIA_ROOT=cls._temp_media_root,
-            STORAGES={
-                "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-                "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-            },
-        )
-        cls._settings_override.enable()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._settings_override.disable()
-        shutil.rmtree(cls._temp_media_root, ignore_errors=True)
-        super().tearDownClass()
-
-
-class FormValidatorsTest(TestCase):
-    def test_validate_image_type_accepts_webp_signature(self):
-        webp = SimpleUploadedFile(
-            "x.webp", b"RIFF\x24\x00\x00\x00WEBPVP8 ", content_type="image/webp"
-        )
-        validate_image_type(webp)  # не должен бросить
-
-    def test_validate_image_type_accepts_png_signature(self):
-        validate_image_type(build_test_image(filename="real.png"))
-
-    def test_validate_image_type_rejects_unknown_signature(self):
-        fake = SimpleUploadedFile("fake.jpg", b"GIF89a not allowed", content_type="image/jpeg")
-        with self.assertRaises(ValidationError):
-            validate_image_type(fake)
-
-    @override_settings(MAX_UPLOAD_SIZE_MB=1)
-    def test_validate_file_size_allows_exact_limit(self):
-        exact = SimpleUploadedFile("exact.jpg", b"x" * (1024 * 1024), content_type="image/jpeg")
-        validate_file_size(exact)  # ровно на границе — проходит
-
-    @override_settings(MAX_UPLOAD_SIZE_MB=1)
-    def test_validate_file_size_rejects_over_limit(self):
-        over = SimpleUploadedFile("over.jpg", b"x" * (1024 * 1024 + 1), content_type="image/jpeg")
-        with self.assertRaises(ValidationError):
-            validate_file_size(over)
-
-
-class ImageUtilsTest(TestCase):
-    def test_decompression_bomb_raises_processing_error(self):
-        with (
-            patch.object(Image, "MAX_IMAGE_PIXELS", 10),
-            self.assertRaises(ImageProcessingError),
-        ):
-            open_image_from_file(BytesIO(build_test_image().read()))
-
-    def test_exif_orientation_is_applied(self):
-        stream = BytesIO()
-        exif = Image.Exif()
-        exif[0x0112] = 6  # Orientation: Rotate 90 CW
-        Image.new("RGB", (40, 20), (0, 0, 255)).save(stream, format="JPEG", exif=exif)
-        stream.seek(0)
-
-        opened = open_image_from_file(stream)
-
-        self.assertEqual(opened.size, (20, 40))
-
-    def test_mirrored_exif_orientation_is_applied(self):
-        stream = BytesIO()
-        exif = Image.Exif()
-        exif[0x0112] = 5  # Mirror horizontal + rotate 270 CW
-        Image.new("RGB", (40, 20), (0, 255, 0)).save(stream, format="JPEG", exif=exif)
-        stream.seek(0)
-
-        opened = open_image_from_file(stream)
-
-        self.assertEqual(opened.size, (20, 40))
-
-    def test_rgba_png_keeps_alpha_in_webp_thumbnail(self):
-        stream = BytesIO()
-        Image.new("RGBA", (32, 32), (255, 0, 0, 128)).save(stream, format="PNG")
-        stream.seek(0)
-
-        opened = open_image_from_file(stream)
-        self.assertEqual(opened.mode, "RGBA")
-
-        content = build_thumbnail_content(opened, "alpha.png")
-        thumbnail = Image.open(BytesIO(content.read()))
-        self.assertIn(thumbnail.mode, ("RGBA", "P"))
-
-
-class PhotoModelTest(GalleryTestCase):
-    def test_photo_string_representation(self):
-        photo = Photo.objects.create(image=build_test_image(), title="Test Photo")
-        self.assertEqual(str(photo), "Test Photo")
-
-    def test_photo_without_title(self):
-        photo = Photo.objects.create(image=build_test_image(filename="test2.png"))
-        self.assertIn("test2", str(photo))
-
-
-class PhotoServicesTest(GalleryTestCase):
-    def test_save_uploaded_photo_creates_all_variants(self):
-        with self.captureOnCommitCallbacks(execute=True):
-            photo = save_uploaded_photo(build_test_image(filename="service.png"))
-
-        photo.refresh_from_db()
-        self.assertTrue(bool(photo.image))
-        self.assertTrue(bool(photo.optimized_image))
-        self.assertTrue(bool(photo.thumbnail))
-
-    def test_save_uploaded_photo_stores_variant_dimensions(self):
-        with self.captureOnCommitCallbacks(execute=True):
-            photo = save_uploaded_photo(build_test_image(filename="dims.png", size=(64, 48)))
-
-        photo.refresh_from_db()
-        self.assertEqual((photo.thumbnail_width, photo.thumbnail_height), (64, 48))
-        self.assertEqual((photo.optimized_width, photo.optimized_height), (64, 48))
-
-    def test_save_uploaded_photo_rejects_duplicate_content(self):
-        with self.captureOnCommitCallbacks(execute=True):
-            save_uploaded_photo(build_test_image(filename="dup.png"))
-
-        with self.assertRaises(DuplicatePhotoError):
-            save_uploaded_photo(build_test_image(filename="dup-renamed.png"))
-
-        self.assertEqual(Photo.objects.count(), 1)
-
-    def test_save_uploaded_photo_cleans_up_files_when_database_save_fails(self):
-        before_files = {
-            path.relative_to(self._temp_media_root)
-            for path in Path(self._temp_media_root).rglob("*")
-            if path.is_file()
-        }
-
-        with (
-            patch.object(Photo, "save", side_effect=RuntimeError("db unavailable")),
-            self.assertRaises(RuntimeError),
-        ):
-            save_uploaded_photo(build_test_image(filename="rollback.png"))
-
-        after_files = {
-            path.relative_to(self._temp_media_root)
-            for path in Path(self._temp_media_root).rglob("*")
-            if path.is_file()
-        }
-        self.assertEqual(after_files, before_files)
-        self.assertEqual(Photo.objects.count(), 0)
-
-    @override_settings(DELETE_ORIGINAL_AFTER_OPTIMIZE=True)
-    def test_save_uploaded_photo_can_delete_original_after_optimization(self):
-        with self.captureOnCommitCallbacks(execute=True):
-            photo = save_uploaded_photo(build_test_image(filename="cleanup.png"))
-        photo.refresh_from_db()
-
-        self.assertFalse(bool(photo.image))
-        self.assertTrue(bool(photo.optimized_image))
-        self.assertTrue(bool(photo.thumbnail))
-
-    def test_signal_backfills_missing_variants_after_create(self):
-        with self.captureOnCommitCallbacks(execute=True):
-            photo = Photo.objects.create(image=build_test_image(filename="signal.png"))
-
-        photo.refresh_from_db()
-        self.assertTrue(bool(photo.optimized_image))
-        self.assertTrue(bool(photo.thumbnail))
-
-    def test_backfill_service_generates_missing_thumbnail(self):
-        photo = Photo.objects.create(
-            image=build_test_image(filename="existing.png"),
-            optimized_image=build_test_image(filename="existing_optimized.png"),
-        )
-        Photo.objects.filter(pk=photo.pk).update(thumbnail="")
-
-        updated = ensure_photo_derivatives_by_id(photo.pk)
-        photo.refresh_from_db()
-
-        self.assertTrue(updated)
-        self.assertTrue(bool(photo.thumbnail))
-
-    @override_settings(ENABLE_BACKGROUND_TASKS=False)
-    def test_schedule_photo_derivatives_processes_inline_when_background_disabled(self):
-        photo = Photo.objects.create(image=build_test_image(filename="inline.png"))
-
-        result = schedule_photo_derivatives(photo.pk)
-        photo.refresh_from_db()
-
-        self.assertEqual(result, "processed")
-        self.assertTrue(bool(photo.optimized_image))
-        self.assertTrue(bool(photo.thumbnail))
-
-    @override_settings(ENABLE_BACKGROUND_TASKS=True)
-    def test_schedule_photo_derivatives_falls_back_inline_when_queueing_fails(self):
-        photo = Photo.objects.create(image=build_test_image(filename="fallback.png"))
-
-        with patch("gallery.tasks.ensure_photo_derivatives_task.delay", side_effect=RuntimeError):
-            result = schedule_photo_derivatives(photo.pk)
-
-        photo.refresh_from_db()
-        self.assertEqual(result, "processed")
-        self.assertTrue(bool(photo.optimized_image))
-        self.assertTrue(bool(photo.thumbnail))
-
-    @override_settings(ENABLE_BACKGROUND_TASKS=True)
-    def test_signal_schedules_background_processing_on_commit(self):
-        with (
-            patch("gallery.signals.schedule_photo_derivatives") as schedule_mock,
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            photo = Photo.objects.create(image=build_test_image(filename="queued.png"))
-
-        schedule_mock.assert_called_once_with(photo.pk)
+from .base import GalleryTestCase, build_test_image
 
 
 class GalleryViewsTest(GalleryTestCase):
@@ -520,3 +281,47 @@ class GalleryViewsTest(GalleryTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("<loc>http://testserver/</loc>", content)
+
+    def test_keyset_cursor_survives_deleted_cursor_photo(self):
+        Photo.objects.bulk_create(
+            [Photo(image=f"photos/d{i}.jpg", title=f"d{i}") for i in range(15)]
+        )
+        first_page = self.client.get(
+            reverse("gallery:index"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        ).json()
+        cursor = first_page["photos"][-1]
+        Photo.objects.filter(pk=cursor["id"]).delete()
+
+        second_page = self.client.get(
+            reverse("gallery:index"),
+            {"after": cursor["id"], "after_ts": cursor["uploaded_at"]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        ).json()
+
+        self.assertEqual(len(second_page["photos"]), 3)
+        self.assertFalse(second_page["has_next"])
+
+    def test_cards_expose_cursor_timestamp(self):
+        photo = Photo.objects.create(image=build_test_image(filename="ts.png"))
+
+        response = self.client.get(reverse("gallery:index"))
+
+        self.assertContains(response, f'data-ts="{photo.uploaded_at.isoformat()}"')
+
+    def test_all_photos_json_breaks_timestamp_ties_by_id(self):
+        Photo.objects.bulk_create(
+            [Photo(image=f"photos/t{i}.jpg", title=f"t{i}") for i in range(6)]
+        )
+        same_time = Photo.objects.first().uploaded_at
+        Photo.objects.update(uploaded_at=same_time)
+
+        pages = [
+            self.client.get(
+                reverse("gallery:all_photos_json"), {"page": page, "page_size": 2}
+            ).json()["photos"]
+            for page in (1, 2, 3)
+        ]
+
+        ids = [photo["id"] for page in pages for photo in page]
+        self.assertEqual(ids, sorted(ids, reverse=True))
+        self.assertEqual(len(set(ids)), 6)

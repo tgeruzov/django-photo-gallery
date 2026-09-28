@@ -5,11 +5,12 @@ import os
 from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 
 from .image_utils import (
     build_optimized_content,
     build_thumbnail_content,
-    open_image_from_path,
+    open_image_from_file,
 )
 from .models import Photo
 
@@ -72,60 +73,109 @@ def save_uploaded_photo(uploaded_file: UploadedFile) -> Photo:
     return photo
 
 
+def photos_missing_derivatives():
+    """Фото, у которых есть исходник, но не хватает вариантов."""
+    return (
+        Photo.objects.filter(Q(optimized_image="") | Q(thumbnail=""))
+        .exclude(image="", optimized_image="")
+        .order_by("id")
+    )
+
+
 def ensure_photo_derivatives_by_id(photo_id: int) -> bool:
-    """Достраивает optimized и thumbnail для существующего фото по id."""
+    """Достраивает optimized и thumbnail для существующего фото по id.
+
+    Перекодирование идёт вне транзакции: select_for_update держится только
+    на короткую запись результата, а не на всё время работы Pillow.
+    """
     try:
-        with transaction.atomic():
-            photo = Photo.objects.select_for_update().get(pk=photo_id)
-            return ensure_photo_derivatives(photo)
+        photo = Photo.objects.get(pk=photo_id)
     except Photo.DoesNotExist:
         logger.warning("Photo %s was removed before derivatives were generated.", photo_id)
         return False
 
+    variants = build_missing_variants(photo)
+    if variants is None:
+        return False
 
-def ensure_photo_derivatives(photo: Photo) -> bool:
-    """Генерирует недостающие варианты изображения для экземпляра фото."""
+    try:
+        with transaction.atomic():
+            try:
+                locked = Photo.objects.select_for_update().get(pk=photo_id)
+            except Photo.DoesNotExist:
+                logger.warning("Photo %s was removed while derivatives were generated.", photo_id)
+                return False
+            return apply_variants(locked, variants)
+    except Exception:
+        # Транзакция откатилась, а файлы в storage уже записаны
+        for field_name in variants:
+            saved_name = variants[field_name].saved_name
+            if saved_name:
+                photo._meta.get_field(field_name).storage.delete(saved_name)
+        raise
+
+
+def build_missing_variants(photo: Photo) -> dict | None:
+    """Готовит недостающие варианты в памяти; None, если делать нечего."""
     source_image = photo.image or photo.optimized_image
     if not source_image:
         logger.warning("Photo %s has no source image for derivative generation.", photo.pk)
-        return False
+        return None
 
-    missing_optimized = not bool(photo.optimized_image)
-    missing_thumbnail = not bool(photo.thumbnail)
-    delete_original = bool(
-        getattr(settings, "DELETE_ORIGINAL_AFTER_OPTIMIZE", False) and photo.image
-    )
+    missing_optimized = not photo.optimized_image
+    missing_thumbnail = not photo.thumbnail
+    if not (missing_optimized or missing_thumbnail or should_delete_original(photo)):
+        return None
 
-    if not (missing_optimized or missing_thumbnail or delete_original):
-        return False
+    variants = {}
+    if missing_optimized or missing_thumbnail:
+        # Через storage, а не .path: работает с любым бэкендом, не только с диском
+        with source_image.open("rb") as fh:
+            image = open_image_from_file(fh)
+        if missing_optimized:
+            variants["optimized_image"] = build_optimized_content(image, source_image.name)
+        if missing_thumbnail:
+            variants["thumbnail"] = build_thumbnail_content(image, source_image.name)
+    for content in variants.values():
+        content.saved_name = None
+    return variants
 
-    image = open_image_from_path(source_image.path)
+
+def should_delete_original(photo: Photo) -> bool:
+    return bool(getattr(settings, "DELETE_ORIGINAL_AFTER_OPTIMIZE", False) and photo.image)
+
+
+def apply_variants(photo: Photo, variants: dict) -> bool:
+    """Записывает подготовленные варианты в заблокированную строку фото."""
     update_fields = []
+    dimension_fields = {
+        "optimized_image": ("optimized_width", "optimized_height"),
+        "thumbnail": ("thumbnail_width", "thumbnail_height"),
+    }
 
-    if missing_optimized:
-        optimized_content = build_optimized_content(image, source_image.name)
-        photo.optimized_image.save(optimized_content.name, optimized_content, save=False)
-        photo.optimized_width, photo.optimized_height = optimized_content.image_dimensions
-        update_fields.extend(["optimized_image", "optimized_width", "optimized_height"])
+    for field_name, content in variants.items():
+        # Параллельный воркер мог успеть раньше - его результат не трогаем
+        if getattr(photo, field_name):
+            continue
+        getattr(photo, field_name).save(content.name, content, save=False)
+        content.saved_name = getattr(photo, field_name).name
+        width_field, height_field = dimension_fields[field_name]
+        setattr(photo, width_field, content.image_dimensions[0])
+        setattr(photo, height_field, content.image_dimensions[1])
+        update_fields.extend([field_name, width_field, height_field])
 
-    if missing_thumbnail:
-        thumbnail_content = build_thumbnail_content(image, source_image.name)
-        photo.thumbnail.save(thumbnail_content.name, thumbnail_content, save=False)
-        photo.thumbnail_width, photo.thumbnail_height = thumbnail_content.image_dimensions
-        update_fields.extend(["thumbnail", "thumbnail_width", "thumbnail_height"])
-
-    if delete_original and photo.optimized_image and photo.thumbnail:
-        photo.image.delete(save=False)
+    if should_delete_original(photo) and photo.optimized_image and photo.thumbnail:
+        # Оригинал удаляется только после коммита: при откате он должен остаться
+        storage, original_name = photo.image.storage, photo.image.name
         photo.image = ""
+        transaction.on_commit(lambda: storage.delete(original_name))
         update_fields.append("image")
 
-    if update_fields:
-        photo.save(update_fields=update_fields)
-        logger.info(
-            "Generated missing derivatives for photo %s (%s).",
-            photo.pk,
-            ", ".join(update_fields),
-        )
-        return True
+    if not update_fields:
+        return False
 
-    return False
+    photo.save(update_fields=update_fields)
+    logger.info(
+        "Generated missing derivatives for photo %s (%s).", photo.pk, ", ".join(update_fields)
+    )
+    return True

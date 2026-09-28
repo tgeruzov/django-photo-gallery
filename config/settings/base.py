@@ -1,10 +1,7 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 BASE_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(BASE_DIR / ".env")
 
 
 def env_bool(name, default=False):
@@ -78,10 +75,8 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# Postgres по умолчанию (docker/CI); sqlite — для площадок без своего сервера
-# БД; mysql — для shared-хостинга Timeweb, где доступен только MySQL.
-_db_engine = os.environ.get("DB_ENGINE", "postgresql").strip().lower()
-if _db_engine == "sqlite":
+# Postgres по умолчанию (docker/CI); sqlite - для локального запуска без сервера БД.
+if os.environ.get("DB_ENGINE", "postgresql").strip().lower() == "sqlite":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -89,28 +84,17 @@ if _db_engine == "sqlite":
         }
     }
 else:
-    _engines = {
-        "postgresql": ("django.db.backends.postgresql", "5432"),
-        "mysql": ("django.db.backends.mysql", "3306"),
-    }
-    _engine_path, _default_port = _engines.get(_db_engine, _engines["postgresql"])
     DATABASES = {
         "default": {
-            "ENGINE": _engine_path,
+            "ENGINE": "django.db.backends.postgresql",
             "NAME": os.environ.get("DB_NAME", "gallery"),
             "USER": os.environ.get("DB_USER", "gallery"),
             "PASSWORD": os.environ.get("DB_PASSWORD", "gallery"),
             "HOST": os.environ.get("DB_HOST", "localhost"),
-            "PORT": os.environ.get("DB_PORT", _default_port),
+            "PORT": os.environ.get("DB_PORT", "5432"),
             "CONN_MAX_AGE": env_int("DB_CONN_MAX_AGE", 60),
         }
     }
-    # MySQL/MariaDB: strict-режим и utf8mb4 (эмодзи в alt/title фото)
-    if _db_engine == "mysql":
-        DATABASES["default"]["OPTIONS"] = {
-            "charset": "utf8mb4",
-            "sql_mode": "STRICT_TRANS_TABLES",
-        }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
