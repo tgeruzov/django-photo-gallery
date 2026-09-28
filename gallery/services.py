@@ -1,28 +1,69 @@
 import hashlib
 import logging
 import os
+from io import BytesIO
 
 from django.conf import settings
-from django.core.files.uploadedfile import UploadedFile
+from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from PIL import Image, ImageOps, UnidentifiedImageError
 
-from .image_utils import (
-    build_optimized_content,
-    build_thumbnail_content,
-    open_image_from_file,
-)
 from .models import Photo
 
 logger = logging.getLogger(__name__)
+
+ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
+THUMBNAIL_SIZE = (800, 800)
+THUMBNAIL_QUALITY = 82
+OPTIMIZED_IMAGE_SIZE = (2560, 2560)
+OPTIMIZED_IMAGE_QUALITY = 85
+
+
+class ImageProcessingError(Exception):
+    pass
 
 
 class DuplicatePhotoError(Exception):
     """Файл с таким содержимым уже загружен в галерею."""
 
 
-def compute_upload_hash(uploaded_file: UploadedFile) -> str:
-    """Считает SHA-256 загружаемого файла почанково и возвращает hex-строку."""
+def open_image(file_obj) -> Image.Image:
+    """Читает изображение с EXIF-поворотом; RGBA для прозрачных, иначе RGB."""
+    file_obj.seek(0)
+    try:
+        img = Image.open(file_obj)
+        img.load()
+        img = img.copy()
+    except Image.DecompressionBombError as exc:
+        raise ImageProcessingError("Слишком большое изображение (слишком много пикселей).") from exc
+    except UnidentifiedImageError as exc:
+        raise ImageProcessingError("Файл не является корректным изображением.") from exc
+    except OSError as exc:
+        raise ImageProcessingError("Не удалось прочитать изображение.") from exc
+    finally:
+        file_obj.seek(0)
+
+    try:
+        img = ImageOps.exif_transpose(img)
+    except Exception:
+        logger.warning("Не удалось обработать EXIF ориентацию")
+    return img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
+
+
+def make_webp(img: Image.Image, size, quality, source_name, suffix) -> ContentFile:
+    """Уменьшенная WEBP-копия; итоговый размер кладётся в image_dimensions."""
+    copy = img.copy()
+    copy.thumbnail(size, Image.Resampling.LANCZOS)
+    buffer = BytesIO()
+    copy.save(buffer, format="WEBP", quality=quality, method=4)
+    base_name = os.path.splitext(os.path.basename(source_name))[0]
+    content = ContentFile(buffer.getvalue(), name=f"{base_name}{suffix}.webp")
+    content.image_dimensions = copy.size
+    content.saved_name = None
+    return content
+
+
+def compute_upload_hash(uploaded_file) -> str:
     hasher = hashlib.sha256()
     for chunk in uploaded_file.chunks():
         hasher.update(chunk)
@@ -30,29 +71,12 @@ def compute_upload_hash(uploaded_file: UploadedFile) -> str:
     return hasher.hexdigest()
 
 
-def cleanup_saved_photo_files(photo: Photo) -> None:
-    """Подчищает файлы, записанные в storage до отката транзакции БД."""
-    for field_name in ("image", "optimized_image", "thumbnail"):
-        file_field = getattr(photo, field_name, None)
-        if not file_field:
-            continue
-        try:
-            file_field.delete(save=False)
-        except OSError:
-            logger.warning("Failed to clean up %s for photo rollback.", field_name)
+def save_uploaded_photo(uploaded_file) -> Photo:
+    """Сохраняет оригинал и сразу строит миниатюру и оптимизированную версию.
 
-
-def save_uploaded_photo(uploaded_file: UploadedFile) -> Photo:
-    """Сохраняет оригинал загрузки; варианты генерируются после коммита.
-
-    Варианты (optimized + thumbnail) создаёт post_save-сигнал через
-    schedule_photo_derivatives - в Celery-воркере или inline-фолбэком -
-    чтобы HTTP-запрос не ждал перекодирования. Оригинал пишется в storage
-    потоково, без чтения файла целиком в память.
+    Если файл не удалось декодировать, запись удаляется, а ошибка
+    пробрасывается - в галерее не остаётся фото без превью.
     """
-    uploaded_file.seek(0)
-    original_name = os.path.basename(uploaded_file.name)
-
     content_hash = compute_upload_hash(uploaded_file)
     if Photo.objects.filter(content_hash=content_hash).exists():
         raise DuplicatePhotoError("такое фото уже загружено")
@@ -60,30 +84,27 @@ def save_uploaded_photo(uploaded_file: UploadedFile) -> Photo:
     photo = Photo(content_hash=content_hash)
     try:
         with transaction.atomic():
-            photo.image.save(original_name, uploaded_file, save=False)
+            photo.image.save(os.path.basename(uploaded_file.name), uploaded_file, save=False)
             photo.save()
     except IntegrityError as exc:
-        # Гонка двух одинаковых загрузок: unique-констрейнт поймал вторую.
-        cleanup_saved_photo_files(photo)
+        # Гонка двух одинаковых загрузок: unique-констрейнт поймал вторую
+        photo.image.delete(save=False)
         raise DuplicatePhotoError("такое фото уже загружено") from exc
     except Exception:
-        cleanup_saved_photo_files(photo)
+        if photo.image:
+            photo.image.delete(save=False)
         raise
 
+    try:
+        ensure_photo_derivatives_by_id(photo.pk)
+    except Exception:
+        photo.delete()
+        raise
     return photo
 
 
-def photos_missing_derivatives():
-    """Фото, у которых есть исходник, но не хватает вариантов."""
-    return (
-        Photo.objects.filter(Q(optimized_image="") | Q(thumbnail=""))
-        .exclude(image="", optimized_image="")
-        .order_by("id")
-    )
-
-
 def ensure_photo_derivatives_by_id(photo_id: int) -> bool:
-    """Достраивает optimized и thumbnail для существующего фото по id.
+    """Достраивает недостающие варианты фото; True, если что-то записано.
 
     Перекодирование идёт вне транзакции: select_for_update держится только
     на короткую запись результата, а не на всё время работы Pillow.
@@ -91,7 +112,6 @@ def ensure_photo_derivatives_by_id(photo_id: int) -> bool:
     try:
         photo = Photo.objects.get(pk=photo_id)
     except Photo.DoesNotExist:
-        logger.warning("Photo %s was removed before derivatives were generated.", photo_id)
         return False
 
     variants = build_missing_variants(photo)
@@ -100,28 +120,25 @@ def ensure_photo_derivatives_by_id(photo_id: int) -> bool:
 
     try:
         with transaction.atomic():
-            try:
-                locked = Photo.objects.select_for_update().get(pk=photo_id)
-            except Photo.DoesNotExist:
-                logger.warning("Photo %s was removed while derivatives were generated.", photo_id)
-                return False
-            return apply_variants(locked, variants)
+            locked = Photo.objects.select_for_update().filter(pk=photo_id).first()
+            return bool(locked) and apply_variants(locked, variants)
     except Exception:
         # Транзакция откатилась, а файлы в storage уже записаны
-        for field_name in variants:
-            saved_name = variants[field_name].saved_name
-            if saved_name:
-                photo._meta.get_field(field_name).storage.delete(saved_name)
+        for field_name, content in variants.items():
+            if content.saved_name:
+                photo._meta.get_field(field_name).storage.delete(content.saved_name)
         raise
+
+
+def should_delete_original(photo: Photo) -> bool:
+    return bool(settings.DELETE_ORIGINAL_AFTER_OPTIMIZE and photo.image)
 
 
 def build_missing_variants(photo: Photo) -> dict | None:
     """Готовит недостающие варианты в памяти; None, если делать нечего."""
-    source_image = photo.image or photo.optimized_image
-    if not source_image:
-        logger.warning("Photo %s has no source image for derivative generation.", photo.pk)
+    source = photo.image or photo.optimized_image
+    if not source:
         return None
-
     missing_optimized = not photo.optimized_image
     missing_thumbnail = not photo.thumbnail
     if not (missing_optimized or missing_thumbnail or should_delete_original(photo)):
@@ -129,32 +146,28 @@ def build_missing_variants(photo: Photo) -> dict | None:
 
     variants = {}
     if missing_optimized or missing_thumbnail:
-        # Через storage, а не .path: работает с любым бэкендом, не только с диском
-        with source_image.open("rb") as fh:
-            image = open_image_from_file(fh)
+        with source.open("rb") as fh:
+            img = open_image(fh)
         if missing_optimized:
-            variants["optimized_image"] = build_optimized_content(image, source_image.name)
+            variants["optimized_image"] = make_webp(
+                img, OPTIMIZED_IMAGE_SIZE, OPTIMIZED_IMAGE_QUALITY, source.name, "_optimized"
+            )
         if missing_thumbnail:
-            variants["thumbnail"] = build_thumbnail_content(image, source_image.name)
-    for content in variants.values():
-        content.saved_name = None
+            variants["thumbnail"] = make_webp(
+                img, THUMBNAIL_SIZE, THUMBNAIL_QUALITY, source.name, "_thumb"
+            )
     return variants
-
-
-def should_delete_original(photo: Photo) -> bool:
-    return bool(getattr(settings, "DELETE_ORIGINAL_AFTER_OPTIMIZE", False) and photo.image)
 
 
 def apply_variants(photo: Photo, variants: dict) -> bool:
     """Записывает подготовленные варианты в заблокированную строку фото."""
-    update_fields = []
     dimension_fields = {
         "optimized_image": ("optimized_width", "optimized_height"),
         "thumbnail": ("thumbnail_width", "thumbnail_height"),
     }
-
+    update_fields = []
     for field_name, content in variants.items():
-        # Параллельный воркер мог успеть раньше - его результат не трогаем
+        # Параллельный запрос мог успеть раньше - его результат не трогаем
         if getattr(photo, field_name):
             continue
         getattr(photo, field_name).save(content.name, content, save=False)
@@ -173,9 +186,5 @@ def apply_variants(photo: Photo, variants: dict) -> bool:
 
     if not update_fields:
         return False
-
     photo.save(update_fields=update_fields)
-    logger.info(
-        "Generated missing derivatives for photo %s (%s).", photo.pk, ", ".join(update_fields)
-    )
     return True

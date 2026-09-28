@@ -85,7 +85,6 @@
     <link rel="icon" href="{% static 'icon/favicon-light.ico' %}" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="{% static 'icon/favicon-dark.ico' %}" media="(prefers-color-scheme: light)" />
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'icon/apple-touch-icon.png' %}" />
-    <link rel="manifest" href="{% static 'site.webmanifest' %}" />
     {% block extra_meta %}{% endblock %}
     {% block head_scripts %}{% endblock %}
   </head>
@@ -96,7 +95,7 @@
         <a class="brand" href="/">{{ seo_site_name|default:"Timur Geruzov" }}</a>
         <div class="topbar-actions">
           {% if user.is_staff or user.is_superuser %}
-          <a class="icon-btn upload-toggle" aria-label="Загрузить фото" title="Загрузить фото" href="{% url 'gallery:upload_photo' %}">
+          <a class="icon-btn upload-toggle" aria-label="Загрузить фото" title="Загрузить фото" href="{% url 'upload_photo' %}">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
