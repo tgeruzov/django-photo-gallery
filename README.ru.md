@@ -38,8 +38,6 @@
   <a href="#choose-your-setup">Варианты запуска</a>
   ·
   <a href="#field-notes">Полевые заметки</a>
-  ·
-  <a href="#community">Сообщество</a>
 </p>
 
 <p align="center">
@@ -271,14 +269,6 @@ django-photo-gallery/
 - Запустить Redis и Celery worker (без них повесить `python manage.py generate_derivatives` на cron, чтобы доделывать недостающие превью)
 - Держать резервные копии `media/`
 - Включить HTTPS redirect в реальном продакшене
-
-<a id="community"></a>
-
-## Сообщество
-
-- [Contributing Guide](CONTRIBUTING.md)
-- [Security Policy](SECURITY.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Лицензия
 

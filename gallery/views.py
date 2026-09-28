@@ -178,7 +178,7 @@ def resolve_feed_cursor(after, after_ts):
 
 
 def feed_after_response(request, photos_list, after, after_ts=None):
-    """P8: keyset-пагинация ленты по (uploaded_at, id) вместо OFFSET."""
+    """Keyset-пагинация ленты по (uploaded_at, id) вместо OFFSET."""
     position = resolve_feed_cursor(after, after_ts)
     if position is None:
         return with_x_robots_tag(
@@ -221,7 +221,7 @@ def index(request):
                 JsonResponse({"photos": [], "has_next": False}),
                 NOINDEX_ROBOTS,
             )
-        # B14: молчаливая отдача последней страницы плодила бесконечные
+        # Молчаливая отдача последней страницы плодила бесконечные
         # URL-дубликаты со статусом 200 для краулеров.
         raise Http404("Страница вне диапазона") from None
 
@@ -261,7 +261,7 @@ def upload_photo(request):
                     ),
                     NOINDEX_ROBOTS,
                 )
-            # H9: без дублирующего message — детали уже выводит form.errors
+            # Без дублирующего message — детали уже выводит form.errors
             return render_upload_page(request, form, status=400)
 
         files = form.cleaned_data.get("files", [])

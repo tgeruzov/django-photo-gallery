@@ -29,7 +29,7 @@ def get_site_locale():
 
 def build_absolute_url(request, path=None):
     # Без path сохраняем query string (?page=N): страницы пагинации
-    # объявляют self-canonical, а не копию главной (SE1).
+    # объявляют self-canonical, а не копию главной.
     if path:
         return request.build_absolute_uri(path)
     return request.build_absolute_uri()
@@ -114,7 +114,7 @@ def build_gallery_structured_data(request, photos, *, title, description):
             image_object["width"] = width
             image_object["height"] = height
 
-        # SE3: авторство и лицензирование — «паспорт» фото для Google Images
+        # Авторство и лицензирование — «паспорт» фото для Google Images
         site_name = get_site_name()
         image_object.update(
             {

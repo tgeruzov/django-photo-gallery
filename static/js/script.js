@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initUploadForm();
 });
 
-// U4/UX15: сообщения закрываются крестиком и сами исчезают через 6 секунд
+// Сообщения закрываются крестиком и сами исчезают через 6 секунд
 function initAlerts() {
   document.querySelectorAll('.alert').forEach(alert => {
     if (alert.id === 'upload-status') return; // управляется формой загрузки
@@ -210,7 +210,7 @@ function initLazyLoad(container) {
 
   const observer = 'IntersectionObserver' in window
     ? new IntersectionObserver((entries) => {
-        // UX9: пачка карточек появляется каскадом, а не одним миганием
+        // Пачка карточек появляется каскадом, а не одним миганием
         const visible = entries.filter(entry => entry.isIntersecting);
         visible.forEach((entry, index) => {
           observer.unobserve(entry.target);
@@ -251,7 +251,7 @@ function initLightbox(gallery, feed) {
   const lightboxImg = lightbox ? lightbox.querySelector('img') : null;
   if (!lightbox || !lightboxImg || !gallery) return;
 
-  // P2: лайтбокс работает по уже загруженным карточкам и догружает
+  // Лайтбокс работает по уже загруженным карточкам и догружает
   // следующую страницу ленты по необходимости — без выкачивания всей
   // библиотеки метаданных при первом клике.
   let allPhotos = [];
@@ -620,7 +620,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
     if (!status) return;
     status.dataset.state = state;
     status.textContent = message;
-    // UX21: ошибка даёт явную кнопку повтора вместо «прокрутите ещё раз»
+    // Ошибка даёт явную кнопку повтора вместо «прокрутите ещё раз»
     if (state === 'error') {
       const retry = document.createElement('button');
       retry.type = 'button';
@@ -636,7 +636,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
     status.hidden = state === 'idle' || message === '';
   };
 
-  // J8: после конца ленты слушатели не должны дёргаться на каждый скролл
+  // После конца ленты слушатели не должны дёргаться на каждый скролл
   let sentinelObserver = null;
   const detachFeedListeners = () => {
     if (sentinelObserver) {
@@ -662,7 +662,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
   async function fetchNextPage() {
     setFeedStatus('loading', 'Загружаем еще фото...');
 
-    // Keyset-курсор от последней карточки (P8); page — фолбэк,
+    // Keyset-курсор от последней карточки; page — фолбэк,
     // если карточек с id нет.
     // data-ts передаётся вместе с id, чтобы курсор пережил удаление этого фото.
     const cards = gallery.querySelectorAll('.card[data-id]');
@@ -703,7 +703,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
           newCards.forEach(card => cardRevealer.observe(card));
           appended = newCards.length;
 
-          // UX20: положение в ленте отражается в URL — «назад»/перезагрузка
+          // Положение в ленте отражается в URL — «назад»/перезагрузка
           // возвращают к текущей странице, а не в самый верх
           const loadedPages = Math.ceil(gallery.querySelectorAll('.card').length / 12);
           if (loadedPages > 1 && 'replaceState' in history) {
@@ -773,13 +773,13 @@ function initUploadForm() {
 
   let selectedFiles = [];
   let uploading = false;
-  const previewCache = new Map(); // file -> Promise<dataURL> (J2: не перекодируем повторно)
+  const previewCache = new Map(); // file -> Promise<dataURL> (не перекодируем повторно)
   const previewNodes = new Map(); // file -> wrapper element
   const fileLabelText = form.querySelector('.file-upload-text');
   const defaultLabelText = fileLabelText ? fileLabelText.textContent : '';
   submitBtn.disabled = true;
 
-  // UX7: файл, уроненный мимо зоны, не должен открываться браузером
+  // Файл, уроненный мимо зоны, не должен открываться браузером
   ['dragover', 'drop'].forEach(ev =>
       window.addEventListener(ev, e => e.preventDefault())
   );
@@ -816,7 +816,7 @@ function initUploadForm() {
   }
 
   function processFiles(files) {
-      // S14: лимит приходит с сервера через data-атрибут, не хардкодится
+      // Лимит приходит с сервера через data-атрибут, не хардкодится
       const maxUploadMb = parseInt(form.dataset.maxUploadMb, 10) || 100;
       const maxBytes = maxUploadMb * 1024 * 1024;
       const validFiles = files.filter(f => f.size <= maxBytes);
@@ -834,7 +834,7 @@ function initUploadForm() {
           setUploadStatus('', '');
       }
 
-      // J9: повторный выбор того же файла не создаёт дубликат в пакете
+      // Повторный выбор того же файла не создаёт дубликат в пакете
       const known = new Set(
           selectedFiles.map(f => `${f.name}|${f.size}|${f.lastModified}`)
       );
@@ -897,7 +897,7 @@ function initUploadForm() {
               img.src = dataUrl;
           }
 
-          // UX11: класс на следующем кадре, чтобы переход появления проигрался
+          // Класс на следующем кадре, чтобы переход появления проигрался
           requestAnimationFrame(() => wrapper.classList.add('loaded'));
       }
 
@@ -905,7 +905,7 @@ function initUploadForm() {
       submitBtn.disabled = selectedFiles.length === 0 || uploading;
   }
 
-  // UX19: подпись зоны показывает, сколько выбрано и на какой объём
+  // Подпись зоны показывает, сколько выбрано и на какой объём
   function updateFileLabel() {
       if (!fileLabelText) return;
       if (!selectedFiles.length) {
@@ -918,7 +918,7 @@ function initUploadForm() {
           `Выбрано: ${selectedFiles.length} файл(ов) · ${totalMb.toFixed(1)} МБ`;
   }
 
-  // J2: превью кодируется один раз на файл; добавление/удаление других
+  // Превью кодируется один раз на файл; добавление/удаление других
   // файлов больше не перегоняет весь список через canvas заново.
   function getPreview(file) {
       if (!previewCache.has(file)) {
@@ -935,7 +935,7 @@ function initUploadForm() {
           }
           const img = new Image();
           const reader = new FileReader();
-          // J1: битый файл резолвится плейсхолдером, а не вечным await
+          // Битый файл резолвится плейсхолдером, а не вечным await
           const fail = () => resolve('');
           reader.onerror = fail;
           img.onerror = fail;
@@ -945,7 +945,7 @@ function initUploadForm() {
                   const ctx = canvas.getContext('2d');
                   canvas.width = 200;
                   canvas.height = 120;
-                  // J4: cover-кроп вместо растягивания — портреты не плющит
+                  // cover-кроп вместо растягивания — портреты не плющит
                   const scale = Math.max(200 / img.width, 120 / img.height);
                   const width = img.width * scale;
                   const height = img.height * scale;
@@ -974,7 +974,7 @@ function initUploadForm() {
       statusBox.hidden = !message;
   }
 
-  // U1: файлы уходят последовательно, по одному запросу на файл —
+  // Файлы уходят последовательно, по одному запросу на файл —
   // виден прогресс, обрыв не теряет весь пакет, ретрай не дублирует
   // уже загруженное (сервер отсекает дубликаты по хешу).
   async function handleFormSubmit(e) {
@@ -1012,7 +1012,7 @@ function initUploadForm() {
                   body: formData,
               });
 
-              // J3: истёкшая сессия отвечает HTML-редиректом на логин —
+              // Истёкшая сессия отвечает HTML-редиректом на логин —
               // отправляем пользователя туда вместо SyntaxError из json().
               const contentType = response.headers.get('content-type') || '';
               if (response.redirected || !contentType.includes('application/json')) {

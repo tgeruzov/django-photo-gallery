@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      # Только loopback: dev-compose на VPS не должен светить БД наружу (S12)
+      # Только loopback: dev-compose на VPS не должен светить БД наружу
       - "127.0.0.1:5432:5432"
 
   web:
