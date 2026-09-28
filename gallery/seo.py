@@ -114,7 +114,7 @@ def build_gallery_structured_data(request, photos, *, title, description):
             image_object["width"] = width
             image_object["height"] = height
 
-        # Авторство и лицензирование — «паспорт» фото для Google Images
+        # Авторство и лицензия фото для Google Images
         site_name = get_site_name()
         image_object.update(
             {
@@ -148,6 +148,6 @@ def build_gallery_structured_data(request, photos, *, title, description):
         },
         ensure_ascii=False,
     )
-    # json.dumps не экранирует "</" — без замены строка "</script>" в title/alt_text
+    # json.dumps не экранирует "</" - без замены строка "</script>" в title/alt_text
     # закрыла бы JSON-LD-блок и исполнилась как HTML (stored XSS).
     return payload.replace("</", "<\\/")

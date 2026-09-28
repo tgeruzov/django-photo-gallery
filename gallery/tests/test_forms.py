@@ -25,7 +25,7 @@ class FormValidatorsTest(TestCase):
     @override_settings(MAX_UPLOAD_SIZE_MB=1)
     def test_validate_file_size_allows_exact_limit(self):
         exact = SimpleUploadedFile("exact.jpg", b"x" * (1024 * 1024), content_type="image/jpeg")
-        validate_file_size(exact)  # ровно на границе — проходит
+        validate_file_size(exact)  # ровно на границе - проходит
 
     @override_settings(MAX_UPLOAD_SIZE_MB=1)
     def test_validate_file_size_rejects_over_limit(self):

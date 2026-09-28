@@ -46,7 +46,7 @@ def save_uploaded_photo(uploaded_file: UploadedFile) -> Photo:
     """Сохраняет оригинал загрузки; варианты генерируются после коммита.
 
     Варианты (optimized + thumbnail) создаёт post_save-сигнал через
-    schedule_photo_derivatives — в Celery-воркере или inline-фолбэком, —
+    schedule_photo_derivatives - в Celery-воркере или inline-фолбэком -
     чтобы HTTP-запрос не ждал перекодирования. Оригинал пишется в storage
     потоково, без чтения файла целиком в память.
     """

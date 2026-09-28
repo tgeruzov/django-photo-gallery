@@ -102,7 +102,7 @@ def build_index_context(request, photos_page):
 
     context = {
         "photos_page": photos_page,
-        # Hero-баннер на главной убран — заголовок остаётся скрытым <h1>
+        # Hero-баннер на главной убран - заголовок остаётся скрытым <h1>
         # (page_heading) ради валидного outline документа и SEO.
         "page_heading": gallery_title,
         "seo_structured_data": build_gallery_structured_data(
@@ -200,7 +200,7 @@ def feed_after_response(request, photos_list, after, after_ts=None):
 
 
 def index(request):
-    # Явный tie-break по id — обязателен для корректного keyset-курсора
+    # Явный tie-break по id - обязателен для корректного keyset-курсора
     photos_list = Photo.objects.all().order_by("-uploaded_at", "-id")
 
     if is_ajax(request) and request.GET.get("after") is not None:
@@ -261,7 +261,7 @@ def upload_photo(request):
                     ),
                     NOINDEX_ROBOTS,
                 )
-            # Без дублирующего message — детали уже выводит form.errors
+            # Без дублирующего message - детали уже выводит form.errors
             return render_upload_page(request, form, status=400)
 
         files = form.cleaned_data.get("files", [])

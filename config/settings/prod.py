@@ -7,7 +7,7 @@ from .base import *  # noqa: F401,F403
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 if (
     not SECRET_KEY
-    or SECRET_KEY == "dev-key-change-in-production"  # noqa: S105 — это dev-дефолт, не секрет
+    or SECRET_KEY == "dev-key-change-in-production"  # noqa: S105 - это dev-дефолт, не секрет
     or len(SECRET_KEY) < 50
 ):
     raise ImproperlyConfigured(
@@ -32,7 +32,7 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 # Redis подключается, только если задан REDIS_CACHE_URL (prod-compose его
-# передаёт); без него остаётся LocMem из base — важно для хостингов без Redis.
+# передаёт); без него остаётся LocMem из base - важно для хостингов без Redis.
 _redis_cache_url = os.environ.get("REDIS_CACHE_URL")
 if _redis_cache_url:
     CACHES = {
@@ -44,14 +44,14 @@ if _redis_cache_url:
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 CSRF_COOKIE_SECURE = True
-# JS берёт CSRF-токен из скрытого поля формы — cookie ему не нужна
+# JS берёт CSRF-токен из скрытого поля формы - cookie ему не нужна
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "Strict"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 2592000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-# preload валиден только при max-age >= 1 года — включать явно через env
+# preload валиден только при max-age >= 1 года - включать явно через env
 SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
 # Healthcheck-и ходят на http://127.0.0.1:8000/healthz изнутри контейнера:

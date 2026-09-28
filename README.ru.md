@@ -1,191 +1,82 @@
-<h1 align="center">Django Photo Gallery</h1>
+# Django Photo Gallery
+
+[English version](README.md)
+
+[![CI](https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg)](https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml)
+![Python 3.11](https://img.shields.io/badge/Python-3.11-2F6DB3?logo=python&logoColor=white)
+![Django 5.2](https://img.shields.io/badge/Django-5.2-0C4B33?logo=django&logoColor=white)
+![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
+[![MIT License](https://img.shields.io/badge/License-MIT-F2C94C)](LICENSE)
+
+Персональная фотогалерея на Django: сетка с бесконечной прокруткой, полноэкранный просмотр и страница загрузки для staff. Загруженные фото конвертируются в WEBP-миниатюры и оптимизированные полноразмерные версии.
 
 <p align="center">
-  Персональная фотогалерея, которая ощущается прежде всего как пространство для просмотра, а уже потом как админка.
-  <br />
-  Быстрый просмотр, полноэкранный режим, оптимизированная выдача изображений и Django-бэкенд, который легко развивать дальше.
+  <img src="docs/image.png" alt="Галерея" width="32%">
+  <img src="docs/upload-preview.png" alt="Страница загрузки" width="32%">
+  <img src="docs/lightbox-preview.jpg" alt="Просмотр фото" width="32%">
 </p>
 
-<p align="center">
-  <a href="README.md">English</a>
-  ·
-  <a href="README.ru.md"><strong>Русский</strong></a>
-</p>
+## Возможности
 
-<p align="center">
-  <a href="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml">
-    <img alt="CI" src="https://github.com/tgeruzov/django-photo-gallery/actions/workflows/ci.yml/badge.svg">
-  </a>
-  <a href="https://www.python.org/downloads/release/python-3110/">
-    <img alt="Python 3.11" src="https://img.shields.io/badge/Python-3.11-2F6DB3?logo=python&logoColor=white">
-  </a>
-  <a href="https://www.djangoproject.com/">
-    <img alt="Django 5.2" src="https://img.shields.io/badge/Django-5.2-0C4B33?logo=django&logoColor=white">
-  </a>
-  <a href="https://www.postgresql.org/">
-    <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white">
-  </a>
-  <a href="LICENSE">
-    <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-F2C94C">
-  </a>
-</p>
+- Masonry-сетка с keyset-пагинацией и ленивой загрузкой
+- Лайтбокс с навигацией с клавиатуры и свайпами
+- Пакетная загрузка для staff с проверкой формата, размера и дубликатов (SHA-256)
+- Миниатюры и оптимизированные версии генерирует Celery, без воркера обработка идёт синхронно
+- SEO: canonical, Open Graph, JSON-LD, sitemap, robots.txt
 
-<p align="center">
-  <a href="#through-the-lens">Через объектив</a>
-  ·
-  <a href="#darkroom-pipeline">Пайплайн обработки</a>
-  ·
-  <a href="#choose-your-setup">Варианты запуска</a>
-  ·
-  <a href="#field-notes">Полевые заметки</a>
-</p>
+## Как обрабатывается загрузка
 
-<p align="center">
-  <img src="docs/image.png" alt="Превью галереи" width="32%">
-  <img src="docs/upload-preview.png" alt="Превью страницы загрузки" width="32%">
-  <img src="docs/lightbox-preview.jpg" alt="Превью lightbox" width="32%">
-</p>
+1. Staff загружает один или несколько файлов JPEG, PNG или WEBP.
+2. Форма проверяет расширение, сигнатуру файла и размер; дубликаты по хешу содержимого пропускаются.
+3. Сохраняется оригинал, после коммита задача строит миниатюру (800px) и оптимизированную версию (2560px).
+4. В сетке показываются миниатюры, в лайтбоксе оптимизированные версии.
 
-<a id="through-the-lens"></a>
+Фото, оставшиеся без вариантов (упал воркер, потерялась очередь), подбирает периодическая задача Celery beat или команда `python manage.py generate_derivatives`.
 
-## Через объектив
+## Запуск
 
-Этот проект построен вокруг самого процесса просмотра фотографий.
-
-- Посетители получают плотную, прокручиваемую галерею с полноэкранным просмотром и удобной навигацией на мобильных.
-- Для staff-пользователей есть отдельный сфокусированный сценарий загрузки, а не перегруженная CMS.
-- Бэкенд сам генерирует оптимизированные версии и миниатюры, чтобы галерея работала быстро без ручной подготовки ассетов.
-- Сам репозиторий подготовлен к долгой жизни: раздельные settings, Docker-сценарии, CI, линтеры и путь к фоновым задачам через Celery.
-
-<table>
-  <tr>
-    <td width="33%">
-      <strong>Для зрителей</strong>
-      <br />
-      Бесконечная прокрутка, стабильная сетка изображений, полноэкранный lightbox, навигация с клавиатуры и свайпы на мобильных.
-    </td>
-    <td width="33%">
-      <strong>Для поддержки проекта</strong>
-      <br />
-      Разделённые Django settings, production-like Docker-профиль, путь для Celery worker и общие тома для `media/` и `staticfiles/`.
-    </td>
-    <td width="33%">
-      <strong>Для контрибьюторов</strong>
-      <br />
-      Pre-commit, Ruff, Black, GitHub Actions и тесты для загрузки, генерации производных изображений и API.
-    </td>
-  </tr>
-</table>
-
-<a id="darkroom-pipeline"></a>
-
-## Пайплайн обработки
-
-```mermaid
-flowchart LR
-    A["Загрузка staff-пользователем"] --> B["Валидация"]
-    B --> C["Запись Photo"]
-    C --> D["Оригинальный файл"]
-    C --> E["Генерация производных"]
-    E --> F["Оптимизированное изображение"]
-    E --> G["Миниатюра"]
-    G --> H["Сетка галереи"]
-    F --> I["Полноэкранный просмотр"]
-    G --> J["JSON API"]
-    E --> K["Celery-задача или eager fallback"]
-```
-
-Одна и та же фотография проходит через небольшой, но продуманный пайплайн:
-
-1. Staff-пользователь загружает один или несколько файлов.
-2. Приложение валидирует формат и размер, затем сохраняет исходное изображение.
-3. Генерируются оптимизированная версия и миниатюра.
-4. В сетке галереи используются более лёгкие файлы, а для полноэкранного просмотра отдаётся крупная оптимизированная версия.
-5. В development это может выполняться eagerly, а в production-like режиме работа может уходить в Celery.
-
-## Чем проект отличается
-
-### Просмотр и есть продукт
-
-Это не универсальная CMS с прикреплёнными картинками. Главная фича здесь именно просмотр, поэтому сетка, lazy loading, lightbox и прогрессивная загрузка так же важны, как и админский сценарий.
-
-### Пайплайн изображений встроен в приложение
-
-Проект не ждёт, что кто-то будет вручную готовить все ассеты. Он сам создаёт нужные версии изображений и умеет догенерировать недостающие производные позже.
-
-### Репозиторий готов к следующему шагу
-
-Проект по-прежнему ощущается как личная галерея, но уже имеет структуру для безопасного развития: отдельные settings, quality gates, документированный production path и поддержку фоновых задач.
-
-<a id="choose-your-setup"></a>
-
-## Варианты запуска
-
-### Самый быстрый старт: Docker
+### Docker
 
 ```bash
-# Linux / macOS
 cp .env.example .env
-
-# Windows PowerShell
-Copy-Item .env.example .env
-
 docker compose up --build
 ```
 
-Открой [http://localhost:8000](http://localhost:8000)
+Приложение откроется на http://localhost:8000.
 
-### Локальный запуск через Python
+### Локально через Python
 
 ```bash
 python -m venv .venv
-```
-
-```bash
-# Windows
-.venv\Scripts\activate
-
-# Linux / macOS
-source .venv/bin/activate
-```
-
-```bash
-cp .env.example .env         # DJANGO_ENV=dev; без локального PostgreSQL поставь DB_ENGINE=sqlite
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+cp .env.example .env           # DJANGO_ENV=dev; DB_ENGINE=sqlite, если нет локального PostgreSQL
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Без `DJANGO_ENV` проект стартует в режиме `prod` и не поднимется без сильного `SECRET_KEY`: забытое окружение на сервере падает сразу, а не работает с `DEBUG=True`.
+Без `DJANGO_ENV` проект стартует в режиме `prod` и не поднимется без сильного `SECRET_KEY`.
 
-### Production-like прогон
+### Продакшен-профиль
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build
 ```
 
-В этом профиле запускаются:
+Сервисы: PostgreSQL, Redis, Django под Gunicorn, Celery worker с beat, nginx для статики и медиа, ежедневные бэкапы через `pg_dump`. В профиле стоит `SECURE_SSL_REDIRECT=0`, чтобы он работал по HTTP на localhost; за HTTPS-прокси его нужно включить.
 
-- Django в режиме `prod`
-- Gunicorn как app server
-- Redis для брокера и result backend Celery
-- отдельный Celery worker
-- PostgreSQL для хранения данных
-- общие named volumes для `media/` и `staticfiles/`
+## Маршруты
 
-Для локального smoke test этот профиль держит `SECURE_SSL_REDIRECT=0`, поэтому приложение остаётся доступным по обычному HTTP. За реальным HTTPS-прокси это нужно снова включить.
-
-## Панель маршрутов
-
-| Route | Назначение |
+| Маршрут | Назначение |
 | --- | --- |
-| `/` | Главная страница галереи с AJAX-пагинацией |
-| `/upload/` | Staff-only страница пакетной загрузки |
-| `/all_photos.json` | Пагинированный API галереи |
-| `/admin/` | Django admin |
+| `/` | Галерея |
+| `/upload/` | Загрузка фото (только staff) |
+| `/all_photos.json` | Пагинированный JSON API |
+| `/admin/` | Админка Django |
+| `/healthz` | Проверка живости (приложение и БД) |
 
-### Пример ответа API
+Пример ответа `/all_photos.json`:
 
 ```json
 {
@@ -193,83 +84,50 @@ docker compose -f docker-compose.prod.yml up --build
     {
       "id": 1,
       "uploaded_at": "2026-02-25T18:04:12.345678+00:00",
-      "url": "/media/thumbnails/2026/02/25/image.webp",
-      "full_url": "/media/optimized/2026/02/25/image.webp",
-      "title": "My photo"
+      "url": "/media/thumbnails/2026/02/25/image_thumb.webp",
+      "full_url": "/media/optimized/2026/02/25/image_optimized.webp",
+      "title": "Моё фото",
+      "alt_text": "Моё фото",
+      "width": 800,
+      "height": 533
     }
   ],
   "page": 1,
-  "page_size": 100,
+  "page_size": 200,
   "has_next": true,
   "total": 240
 }
 ```
 
-<a id="field-notes"></a>
+## Настройки
 
-## Полевые заметки
+Все переменные с комментариями перечислены в [.env.example](.env.example). Основные:
 
-<details open>
-<summary><strong>Ключевые переменные окружения</strong></summary>
+- Приложение: `DJANGO_ENV`, `DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`
+- База данных: `DB_ENGINE`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
+- Изображения: `MAX_UPLOAD_SIZE_MB`, `MAX_IMAGE_PIXELS`, `DELETE_ORIGINAL_AFTER_OPTIMIZE`
+- Фоновые задачи: `ENABLE_BACKGROUND_TASKS`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`
 
-- Базовое приложение: `DJANGO_ENV`, `DEBUG`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `TIME_ZONE`
-- База данных: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_CONN_MAX_AGE`
-- Пайплайн изображений: `MAX_UPLOAD_SIZE_MB`, `MAX_IMAGE_PIXELS`, `MAX_JSON_PAGE_SIZE`, `DELETE_ORIGINAL_AFTER_OPTIMIZE`
-- Фоновая обработка: `ENABLE_BACKGROUND_TASKS`, `CELERY_TASK_ALWAYS_EAGER`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`
-- Безопасность продакшена: `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`
-- Логирование: `LOG_LEVEL`
-
-</details>
-
-<details>
-<summary><strong>Проверки качества</strong></summary>
+## Разработка
 
 ```bash
 pip install -r requirements-dev.txt
 pre-commit install
 pre-commit run --all-files
-python manage.py check
 DJANGO_ENV=test python manage.py test
 ```
 
-GitHub Actions тоже запускает линтинг, миграции и тесты на `push` и `pull_request`.
-
-</details>
-
-<details>
-<summary><strong>Карта репозитория</strong></summary>
-
-```text
-django-photo-gallery/
-├── config/                  # Django config, split settings, Celery wiring
-├── docs/                    # README assets
-├── deploy/                  # nginx config for the prod compose profile
-├── gallery/                 # Models, views, services, forms, tests/
-├── static/                  # CSS, JS, icons
-├── .github/workflows/       # CI pipeline
-├── docker-compose.yml
-├── docker-compose.prod.yml
-├── pyproject.toml
-├── .pre-commit-config.yaml
-├── requirements.txt
-├── requirements-dev.txt
-└── manage.py
-```
-
-</details>
+CI (GitHub Actions) запускает pre-commit (Ruff), pip-audit, `check --deploy`, миграции и тесты на PostgreSQL.
 
 ## Чеклист для продакшена
 
-- Установить `DJANGO_ENV=prod`
-- Установить `DEBUG=0`
-- Использовать сильный случайный `SECRET_KEY` и недефолтный `DB_PASSWORD`
-- Жёстко настроить `ALLOWED_HOSTS`
-- Настроить `CSRF_TRUSTED_ORIGINS`
-- Выполнить `python manage.py collectstatic --noinput`
-- Запустить Redis и Celery worker (без них повесить `python manage.py generate_derivatives` на cron, чтобы доделывать недостающие превью)
-- Держать резервные копии `media/`
-- Включить HTTPS redirect в реальном продакшене
+- `DJANGO_ENV=prod`, `DEBUG=0`
+- Сильный случайный `SECRET_KEY` и недефолтный `DB_PASSWORD`
+- `ALLOWED_HOSTS` и `CSRF_TRUSTED_ORIGINS` под свой домен
+- HTTPS и `SECURE_SSL_REDIRECT=1`
+- Redis и Celery worker или `generate_derivatives` по cron
+- Бэкапы `media/` и базы данных
 
 ## Лицензия
 
-Проект распространяется по лицензии MIT. См. [LICENSE](LICENSE).
+MIT, см. [LICENSE](LICENSE).
