@@ -2,29 +2,21 @@ import contextlib
 import json
 import mimetypes
 
-from django.conf import settings
+from django.contrib.sitemaps import Sitemap
+from django.urls import reverse
+
+from .models import Photo
 
 # Python < 3.13 не знает webp из коробки
 mimetypes.add_type("image/webp", ".webp")
 
 
-def get_site_name():
-    return getattr(settings, "SITE_NAME", "Timur Geruzov")
-
-
-def get_default_meta_description():
-    return getattr(
-        settings,
-        "DEFAULT_META_DESCRIPTION",
-        (
-            "Авторская фотогалерея Тимура Герузова с полноэкранным просмотром, "
-            "оптимизированной загрузкой и акцентом на визуальную подачу."
-        ),
-    )
-
-
-def get_site_locale():
-    return getattr(settings, "SITE_LOCALE", "ru_RU")
+SITE_NAME = "Timur Geruzov"
+SITE_LOCALE = "ru_RU"
+DEFAULT_META_DESCRIPTION = (
+    "Авторская фотогалерея Тимура Герузова с полноэкранным просмотром, "
+    "оптимизированной загрузкой и акцентом на визуальную подачу."
+)
 
 
 def build_absolute_url(request, path=None):
@@ -62,17 +54,17 @@ def build_seo_context(
     image_height=None,
     og_type="website",
 ):
-    site_name = get_site_name()
+    site_name = SITE_NAME
     clean_title = (title or site_name).strip()
     seo_title = site_name if clean_title == site_name else f"{clean_title} | {site_name}"
 
     return {
         "seo_title": seo_title,
-        "seo_description": (description or get_default_meta_description()).strip(),
+        "seo_description": (description or DEFAULT_META_DESCRIPTION).strip(),
         "seo_canonical_url": build_absolute_url(request, canonical_path),
         "seo_robots": robots,
         "seo_site_name": site_name,
-        "seo_locale": get_site_locale(),
+        "seo_locale": SITE_LOCALE,
         "seo_og_type": og_type,
         "seo_twitter_card": "summary_large_image" if image_url else "summary",
         "seo_image_url": image_url,
@@ -88,7 +80,7 @@ def build_gallery_structured_data(request, photos, *, title, description):
         {
             "@type": "WebSite",
             "@id": f"{build_absolute_url(request)}#website",
-            "name": get_site_name(),
+            "name": SITE_NAME,
             "url": build_absolute_url(request),
             "inLanguage": "ru",
             "description": description,
@@ -115,7 +107,7 @@ def build_gallery_structured_data(request, photos, *, title, description):
             image_object["height"] = height
 
         # Авторство и лицензия фото для Google Images
-        site_name = get_site_name()
+        site_name = SITE_NAME
         image_object.update(
             {
                 "creator": {"@type": "Person", "name": site_name},
@@ -151,3 +143,17 @@ def build_gallery_structured_data(request, photos, *, title, description):
     # json.dumps не экранирует "</" - без замены строка "</script>" в title/alt_text
     # закрыла бы JSON-LD-блок и исполнилась как HTML (stored XSS).
     return payload.replace("</", "<\\/")
+
+
+class RootSitemap(Sitemap):
+    changefreq = "daily"
+    priority = 1.0
+
+    def items(self):
+        return ["index"]
+
+    def location(self, item):
+        return reverse(item)
+
+    def lastmod(self, item):
+        return Photo.objects.order_by("-uploaded_at").values_list("uploaded_at", flat=True).first()

@@ -1,9 +1,12 @@
 import logging
 
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.validators import FileExtensionValidator
 from django.db import connections
 from django.db.models import Q
 from django.db.utils import OperationalError
@@ -15,9 +18,6 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_GET
 
-from .constants import AJAX_VALUE
-from .forms import PhotoUploadForm
-from .image_utils import ImageProcessingError
 from .models import Photo
 from .seo import (
     build_gallery_structured_data,
@@ -25,15 +25,88 @@ from .seo import (
     get_primary_photo_file,
     get_primary_photo_url,
 )
-from .services import DuplicatePhotoError, save_uploaded_photo
+from .services import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    DuplicatePhotoError,
+    ImageProcessingError,
+    save_uploaded_photo,
+)
 
 logger = logging.getLogger(__name__)
 NOINDEX_ROBOTS = "noindex, nofollow, noarchive"
 FEED_PAGE_SIZE = 12
+MAX_JSON_PAGE_SIZE = 200
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+    def __init__(self, attrs=None):
+        # Диалог выбора файлов сразу фильтрует по допустимым форматам
+        super().__init__({"accept": "image/jpeg,image/png,image/webp", **(attrs or {})})
+
+
+class MultipleFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if not data:
+            if self.required:
+                raise ValidationError(self.error_messages["required"], code="required")
+            return []
+        if isinstance(data, list | tuple):
+            result = [single_file_clean(d, initial) for d in data]
+            return result
+        return [single_file_clean(data, initial)]
+
+
+def validate_file_size(uploaded_file):
+    """Проверяет размер файла по MAX_UPLOAD_SIZE_MB."""
+    limit_mb = settings.MAX_UPLOAD_SIZE_MB
+    limit_bytes = limit_mb * 1024 * 1024
+    if uploaded_file.size > limit_bytes:
+        raise ValidationError(
+            f"Файл слишком большой ({uploaded_file.size // 1024 // 1024}MB). Максимум: {limit_mb}MB"
+        )
+
+
+def validate_image_type(uploaded_file):
+    """Проверяет тип изображения по сигнатурам файлов"""
+    uploaded_file.seek(0)
+    header = uploaded_file.read(12)  # Читаем первые байты
+    uploaded_file.seek(0)
+
+    # Сигнатуры форматов
+    if header.startswith(b"\xff\xd8\xff"):
+        return  # JPEG
+    elif header.startswith(b"\x89PNG\r\n\x1a\n"):
+        return  # PNG
+    elif header.startswith(b"RIFF") and header[8:12] == b"WEBP":
+        return  # WEBP
+
+    raise ValidationError("Недопустимый формат файла. Разрешены только JPEG, PNG, WEBP.")
+
+
+class PhotoUploadForm(forms.Form):
+    files = MultipleFileField(
+        label="Выберите файлы",
+        required=True,
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=ALLOWED_IMAGE_EXTENSIONS,
+                message="Недопустимое расширение файла. Разрешены: %(allowed_extensions)s",
+            ),
+            validate_file_size,
+            validate_image_type,
+        ],
+    )
 
 
 def is_ajax(request):
-    return request.headers.get("X-Requested-With") == AJAX_VALUE
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
 
 def serialize_photo(photo):
@@ -130,7 +203,7 @@ def build_upload_context(request, form):
     context = {
         "form": form,
         "page_heading": "Загрузка фотографий",
-        "max_upload_size_mb": getattr(settings, "MAX_UPLOAD_SIZE_MB", 100),
+        "max_upload_size_mb": settings.MAX_UPLOAD_SIZE_MB,
     }
     context.update(
         build_seo_context(
@@ -138,7 +211,7 @@ def build_upload_context(request, form):
             title="Загрузка фотографий",
             description="Служебная закрытая страница для управления публикацией фотографий.",
             robots=NOINDEX_ROBOTS,
-            canonical_path=reverse("gallery:upload_photo"),
+            canonical_path=reverse("upload_photo"),
         )
     )
     return context
@@ -313,7 +386,7 @@ def upload_photo(request):
                 JsonResponse(
                     {
                         "success": True,
-                        "redirect_url": reverse("gallery:index"),
+                        "redirect_url": reverse("index"),
                         "message": msg,
                         "errors": errors,
                         "duplicates": duplicates,
@@ -330,7 +403,7 @@ def upload_photo(request):
             messages.success(request, msg)
         for duplicate in duplicates:
             messages.info(request, duplicate)
-        return redirect(reverse("gallery:index"))
+        return redirect(reverse("index"))
 
     return render_upload_page(request, form)
 
@@ -340,7 +413,7 @@ def upload_photo(request):
 def all_photos_json(request):
     # tie-break по id: без него фото с одинаковым временем прыгают между страницами
     photos = Photo.objects.all().order_by("-uploaded_at", "-id")
-    max_page_size = max(1, getattr(settings, "MAX_JSON_PAGE_SIZE", 200))
+    max_page_size = MAX_JSON_PAGE_SIZE
 
     try:
         page_size = int(request.GET.get("page_size", max_page_size))

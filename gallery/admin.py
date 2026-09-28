@@ -1,8 +1,9 @@
 from django.contrib import admin, messages
+from django.db import transaction
 from django.utils.html import format_html
 
 from .models import Photo
-from .tasks import schedule_photo_derivatives
+from .services import ensure_photo_derivatives_by_id
 
 
 @admin.register(Photo)
@@ -70,29 +71,24 @@ class PhotoAdmin(admin.ModelAdmin):
             obj.title or obj.alt_text or f"Photo {obj.pk}",
         )
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # Фото, добавленное через админку, тоже получает превью
+        transaction.on_commit(lambda: ensure_photo_derivatives_by_id(obj.pk))
+
     @admin.action(description="Generate missing derivatives")
     def generate_missing_derivatives(self, request, queryset):
-        scheduled = 0
-        processed = 0
-        skipped = 0
-        failed = 0
-
+        processed = skipped = failed = 0
         for photo_id in queryset.values_list("id", flat=True):
-            result = schedule_photo_derivatives(photo_id)
-            if result == "scheduled":
-                scheduled += 1
-            elif result == "processed":
-                processed += 1
-            elif result == "skipped":
-                skipped += 1
-            elif result == "failed":
+            try:
+                if ensure_photo_derivatives_by_id(photo_id):
+                    processed += 1
+                else:
+                    skipped += 1
+            except Exception:
                 failed += 1
-
         self.message_user(
             request,
-            (
-                "Derivative jobs: "
-                f"scheduled={scheduled}, processed={processed}, skipped={skipped}, failed={failed}."
-            ),
+            f"Derivatives: processed={processed}, skipped={skipped}, failed={failed}.",
             level=messages.WARNING if failed else messages.INFO,
         )

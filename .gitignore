@@ -1,33 +1,9 @@
-# База данных
-db.sqlite3
-
-# Виртуальное окружение
-.venv/
-venv/
-
-# Файлы Python
 __pycache__/
 *.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.pre-commit-cache/
-.coverage
-.coverage.*
-
-# Медиа файлы (загруженные пользователями)
+.venv/
+venv/
 media/
-
-# Дампы БД из prod-compose
-backups/
-
-# Статические файлы (собранные collectstatic)
 staticfiles/
-
-# Переменные окружения
 .env
-
-# IDE и OS артефакты
 .idea/
 .vscode/
-.DS_Store
