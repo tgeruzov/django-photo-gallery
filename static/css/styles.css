@@ -31,11 +31,8 @@
   --text-md: 1rem;
   --text-lg: 1.125rem;
   --text-title: clamp(1.6rem, 1.2rem + 1.6vw, 2.1rem);
-  --text-display: clamp(2.4rem, 1.4rem + 4vw, 3.9rem);
-  --leading-tight: 1.1;
   --leading-normal: 1.6;
   --tracking-tight: -0.02em;
-  --tracking-wide: 0.04em;
 
   /* Шкала отступов — сетка 4px */
   --sp-1: 0.25rem;
@@ -68,7 +65,6 @@
 
   /* Палитра — тёмная тема (по умолчанию) */
   --bg: #0c0d0f;
-  --bg-elevated: #131518;
   --surface: #17191d;
   --surface-2: #1e2126;
   --border: rgba(235, 240, 245, 0.09);
@@ -119,7 +115,6 @@ html.light {
   color-scheme: light;
 
   --bg: #f7f7f5;
-  --bg-elevated: #ffffff;
   --surface: #ffffff;
   --surface-2: #eef0f1;
   --border: rgba(15, 20, 25, 0.1);
@@ -128,7 +123,7 @@ html.light {
   --text-2: rgba(22, 24, 26, 0.66);
   --text-3: rgba(22, 24, 26, 0.45);
 
-  --accent-text: #1c6a94; /* ≥4.5:1 на --bg — текстовые ссылки читаемы (C4) */
+  --accent-text: #1c6a94; /* ≥4.5:1 на --bg — текстовые ссылки читаемы */
   --accent-tint: rgba(86, 178, 218, 0.14);
   --accent-tint-strong: rgba(86, 178, 218, 0.24);
   --cta-bg: #1f78a8;
@@ -235,7 +230,7 @@ html.light body::after {
   padding-inline: var(--container-pad);
 }
 
-/* UX14: плавный переход между страницами (прогрессивно) */
+/* Плавный переход между страницами (прогрессивно) */
 @view-transition {
   navigation: auto;
 }
@@ -281,7 +276,7 @@ html.light body::after {
   white-space: nowrap;
 }
 
-/* C3: уважение prefers-reduced-motion — глушим фоновые анимации
+/* Уважение prefers-reduced-motion — глушим фоновые анимации
    и сводим переходы к мгновенным */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -296,7 +291,7 @@ html.light body::after {
 
 /* --------------------------------------------------------------------------
    4. Topbar — тонкая sticky-шапка вместо фиксированного hero:
-      контент больше не живёт под магическим --header-offset (C1)
+      контент больше не живёт под магическим --header-offset
    -------------------------------------------------------------------------- */
 
 .topbar {
@@ -385,7 +380,7 @@ html.light body::after {
   gap: var(--sp-2);
 }
 
-/* Иконки-действия: стеклянные капсулы, touch-target ≥44px (C8) */
+/* Иконки-действия: стеклянные капсулы, touch-target ≥44px */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -481,7 +476,7 @@ html.theme-switching::view-transition-new(root) {
    -------------------------------------------------------------------------- */
 
 .gallery {
-  /* C5 (осознанно): column-count раскладывает фото по колонкам сверху вниз,
+  /* Осознанно: column-count раскладывает фото по колонкам сверху вниз,
      поэтому визуальный порядок не совпадает с хронологией/лайтбоксом.
      CSS Grid сохранил бы порядок, но менял бы характер masonry-раскладки —
      оставлено как продуктовое решение. */
@@ -524,7 +519,7 @@ html.theme-switching::view-transition-new(root) {
   transition: transform var(--dur-3) var(--ease-out);
 }
 
-/* UX1+UX13: при работающем JS до загрузки прячется только изображение,
+/* При работающем JS до загрузки прячется только изображение,
    а карточка держит место и показывает шиммер — лента не «прыгает».
    Без JS галерея видна сразу. */
 html.js .card:not(.loaded) {
@@ -630,7 +625,7 @@ html.js .card:nth-child(even):not(.loaded) {
   transform: translateY(0);
 }
 
-/* UX10: hover-тень анимируется через opacity псевдоэлемента
+/* hover-тень анимируется через opacity псевдоэлемента
    (box-shadow вызывал repaint на каждом кадре) */
 .card::after {
   content: "";
@@ -1149,7 +1144,7 @@ html.js .card:nth-child(even):not(.loaded) {
 
 .preview-container {
   display: grid;
-  /* UX6: сетка сама подстраивается под ширину экрана */
+  /* Сетка сама подстраивается под ширину экрана */
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: var(--sp-3);
 }
@@ -1360,7 +1355,7 @@ html.js .card:nth-child(even):not(.loaded) {
   }
 }
 
-/* U4/UX15: плавное скрытие без резкого сдвига контента */
+/* Плавное скрытие без резкого сдвига контента */
 .alert.alert-hidden {
   opacity: 0;
   transform: translateY(-4px);
@@ -1391,7 +1386,7 @@ html.js .card:nth-child(even):not(.loaded) {
   transform: rotate(90deg);
 }
 
-/* UX22: success и danger различаются фоном и цветом, а не только рамкой */
+/* success и danger различаются фоном и цветом, а не только рамкой */
 .alert-success,
 .alert-info {
   border-color: var(--success-border);
@@ -1600,7 +1595,7 @@ html.js .card:nth-child(even):not(.loaded) {
     font-size: var(--text-md);
   }
 
-  /* Тап-зоны и свайпы заменяют стрелки (C2) */
+  /* Тап-зоны и свайпы заменяют стрелки */
   .lightbox-prev,
   .lightbox-next {
     display: none;

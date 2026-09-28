@@ -38,8 +38,6 @@
   <a href="#choose-your-setup">Choose Your Setup</a>
   ·
   <a href="#field-notes">Field Notes</a>
-  ·
-  <a href="#community">Community</a>
 </p>
 
 <p align="center">
@@ -263,12 +261,6 @@ django-photo-gallery/
 - Run Redis and a Celery worker (without them, schedule `python manage.py generate_derivatives` via cron to backfill missing previews)
 - Keep `media/` backed up
 - Enable HTTPS redirects in real production
-
-## Community
-
-- [Contributing Guide](CONTRIBUTING.md)
-- [Security Policy](SECURITY.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## License
 
