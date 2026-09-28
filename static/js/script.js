@@ -362,11 +362,13 @@ function initLightbox(gallery, feed) {
     showSwipeHint();
   }
 
-  // Zoom-переходы «как в галерее iPhone»: фото вылетает из своей карточки
-  // и при закрытии сжимается точно обратно (FLIP через WAAPI).
+  // Переходы в духе DomeGallery (React Bits): фото вырастает из карточки,
+  // одновременно проявляясь, а при закрытии сжимается в неё, растворяясь;
+  // затем сама карточка мягко проявляется на месте. FLIP через WAAPI.
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const canZoom = () =>
     typeof lightboxImg.animate === 'function' && !reduceMotion.matches;
+  const ENLARGE_MS = 300;
   let closing = false;
 
   function finishClose() {
@@ -375,12 +377,34 @@ function initLightbox(gallery, feed) {
     lightbox.setAttribute('aria-hidden', 'true');
     lightboxImg.removeAttribute('src');
     lightboxImg.style.opacity = '';
+    lightboxImg.style.transformOrigin = '';
     // Снимаем fill:forwards прошлого полёта, чтобы следующий показ был чистым
     if (typeof lightboxImg.getAnimations === 'function') {
       lightboxImg.getAnimations().forEach(animation => animation.cancel());
     }
     currentIndex = -1;
     updateCounter();
+  }
+
+  // Трансформация, которая кладёт кадр лайтбокса ровно на прямоугольник rect
+  // (от левого верхнего угла, раздельный масштаб по осям, как в DomeGallery)
+  function frameToRect(frame, cardEl) {
+    const rect = cardEl.getBoundingClientRect();
+    const sx = rect.width / frame.width;
+    const sy = rect.height / frame.height;
+    // Радиус компенсируется масштабом, чтобы визуально совпасть с карточкой
+    const radius = parseFloat(getComputedStyle(cardEl).borderTopLeftRadius) || 0;
+    return {
+      transform: `translate(${rect.left - frame.left}px, ${rect.top - frame.top}px) scale(${sx}, ${sy})`,
+      radius: `${radius / sx}px / ${radius / sy}px`,
+    };
+  }
+
+  function fadeInCard(el) {
+    el.style.visibility = '';
+    if (typeof el.animate === 'function') {
+      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ENLARGE_MS, easing: 'ease-out' });
+    }
   }
 
   function zoomFromCard(sourceEl) {
@@ -390,25 +414,26 @@ function initLightbox(gallery, feed) {
       const from = sourceEl.getBoundingClientRect();
       const to = lightboxImg.getBoundingClientRect();
       if (!from.width || !to.width) return;
-      const dx = from.left + from.width / 2 - (to.left + to.width / 2);
-      const dy = from.top + from.height / 2 - (to.top + to.height / 2);
-      const scale = from.width / to.width;
+      const start = frameToRect(to, sourceEl);
+      const endRadius = getComputedStyle(lightboxImg).borderTopLeftRadius;
 
-      // На время полёта фото «поднимается» из сетки — карточка пустеет
+      // Фото «поднимается» из сетки - карточка пустеет на время полёта
       sourceEl.style.visibility = 'hidden';
+      lightboxImg.style.transformOrigin = 'top left';
       const animation = lightboxImg.animate(
         [
-          { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, borderRadius: `${12 / scale}px` },
-          { transform: 'none', borderRadius: '8px' },
+          { transform: start.transform, borderRadius: start.radius, opacity: 0 },
+          { transform: 'none', borderRadius: endRadius, opacity: 1 },
         ],
-        { duration: 420, easing: 'cubic-bezier(0.2, 0.9, 0.25, 1)' }
+        { duration: ENLARGE_MS, easing: 'ease' }
       );
-      settleAnimation(animation, 620, () => {
+      settleAnimation(animation, ENLARGE_MS + 200, () => {
+        lightboxImg.style.transformOrigin = '';
         sourceEl.style.visibility = '';
       });
     };
 
-    // Миниатюра почти всегда уже в кэше (она на экране) — размер известен
+    // Миниатюра почти всегда уже в кэше (она на экране) - размер известен
     // синхронно; иначе прячем кадр до load, чтобы не мигнул в полный размер.
     if (lightboxImg.complete && lightboxImg.naturalWidth) {
       fly();
@@ -454,35 +479,34 @@ function initLightbox(gallery, feed) {
       const from = lightboxImg.getBoundingClientRect();
       const inViewport = to.width > 0 && to.bottom > 0 && to.top < window.innerHeight;
       if (inViewport && from.width > 0) {
-        const dx = to.left + to.width / 2 - (from.left + from.width / 2);
-        const dy = to.top + to.height / 2 - (from.top + from.height / 2);
-        const scale = to.width / from.width;
+        const end = frameToRect(from, sourceEl);
         sourceEl.style.visibility = 'hidden';
+        lightboxImg.style.transformOrigin = 'top left';
         const animation = lightboxImg.animate(
           [
-            { transform: 'none', borderRadius: '8px' },
-            { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, borderRadius: `${12 / scale}px` },
+            { transform: 'none', opacity: 1 },
+            { transform: end.transform, borderRadius: end.radius, opacity: 0 },
           ],
-          { duration: 400, easing: 'cubic-bezier(0.3, 0.7, 0.3, 1)', fill: 'forwards' }
+          { duration: ENLARGE_MS, easing: 'ease-out', fill: 'forwards' }
         );
-        settleAnimation(animation, 600, () => {
-          sourceEl.style.visibility = '';
+        settleAnimation(animation, ENLARGE_MS + 200, () => {
           finishClose();
+          fadeInCard(sourceEl);
         });
         return;
       }
     }
 
     if (canZoom() && hasImage) {
-      // Карточка вне экрана — мягкое сжатие с растворением
+      // Карточка вне экрана - мягкое сжатие с растворением
       const animation = lightboxImg.animate(
         [
           { transform: 'none', opacity: 1 },
           { transform: 'scale(0.9)', opacity: 0 },
         ],
-        { duration: 220, easing: 'ease-in', fill: 'forwards' }
+        { duration: ENLARGE_MS, easing: 'ease-out', fill: 'forwards' }
       );
-      settleAnimation(animation, 400, finishClose);
+      settleAnimation(animation, ENLARGE_MS + 200, finishClose);
       return;
     }
 
