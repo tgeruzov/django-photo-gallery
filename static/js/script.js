@@ -32,8 +32,8 @@ function initHeaderBehavior() {
   const topbar = document.querySelector('.topbar');
   const scrollTopBtn = document.querySelector('.scroll-top');
 
-  // Шапка sticky и живёт в потоке — разделитель появляется только
-  // после начала скролла; заодно ведём прогресс-волосок и кнопку «наверх».
+  // Шапка sticky и живёт в потоке - разделитель появляется только
+  // после начала скролла; здесь же обновляются индикатор прокрутки и кнопка "наверх".
   const syncScroll = () => {
     const y = window.scrollY;
     if (topbar) {
@@ -143,9 +143,9 @@ function setupThemeSwitcher() {
           return;
       }
 
-      // Новая тема «разливается» кругом от кнопки-переключателя.
+      // Новая тема раскрывается кругом от кнопки-переключателя.
       // Класс theme-switching отключает дефолтный кросс-фейд только
-      // на время этого перехода (см. CSS), навигационный — не трогает.
+      // на время этого перехода (см. CSS), навигационный - не трогает.
       const rect = themeBtn.getBoundingClientRect();
       const x = rect.left + rect.width / 2;
       const y = rect.top + rect.height / 2;
@@ -252,7 +252,7 @@ function initLightbox(gallery, feed) {
   if (!lightbox || !lightboxImg || !gallery) return;
 
   // Лайтбокс работает по уже загруженным карточкам и догружает
-  // следующую страницу ленты по необходимости — без выкачивания всей
+  // следующую страницу ленты по необходимости - без выкачивания всей
   // библиотеки метаданных при первом клике.
   let allPhotos = [];
   let currentIndex = -1;
@@ -269,7 +269,7 @@ function initLightbox(gallery, feed) {
           url: img.src,
           full_url: img.getAttribute('data-full'),
           title: img.alt || '',
-          el: img, // источник/цель zoom-полёта (как в галерее iPhone)
+          el: img, // источник и цель перехода открытия/закрытия
       }))
       .filter(photo => photo.url && photo.full_url);
   }
@@ -281,8 +281,7 @@ function initLightbox(gallery, feed) {
       : '';
   }
 
-  // Ambient-свечение: средний цвет снимка (по миниатюре из кэша браузера)
-  // подсвечивает фон лайтбокса — фото «освещает комнату».
+  // Средний цвет снимка (по миниатюре из кэша браузера) подсвечивает фон лайтбокса.
   const glowCache = new Map(); // url -> rgba-строка
   function applyPhotoGlow(url) {
     if (glowCache.has(url)) {
@@ -308,7 +307,7 @@ function initLightbox(gallery, feed) {
         }
         glow = `rgba(${Math.round(r / count)}, ${Math.round(g / count)}, ${Math.round(b / count)}, 0.5)`;
       } catch (err) {
-        // canvas может быть «испачкан» кросс-доменным файлом — остаётся дефолт
+        // canvas может быть "испачкан" кросс-доменным файлом - остаётся дефолт
       }
       glowCache.set(url, glow);
       lightbox.style.setProperty('--photo-glow', glow);
@@ -417,7 +416,7 @@ function initLightbox(gallery, feed) {
       const start = frameToRect(to, sourceEl);
       const endRadius = getComputedStyle(lightboxImg).borderTopLeftRadius;
 
-      // Фото «поднимается» из сетки - карточка пустеет на время полёта
+      // Фото "поднимается" из сетки - карточка пустеет на время полёта
       sourceEl.style.visibility = 'hidden';
       lightboxImg.style.transformOrigin = 'top left';
       const animation = lightboxImg.animate(
@@ -447,7 +446,7 @@ function initLightbox(gallery, feed) {
   }
 
   function openLightbox(index) {
-    if (closing) finishClose(); // предыдущее закрытие ещё летит — обрываем
+    if (closing) finishClose(); // предыдущее закрытие ещё летит - обрываем
     lastFocused = document.activeElement;
     lightbox.classList.add('active');
     lightbox.setAttribute('aria-hidden', 'false');
@@ -542,7 +541,7 @@ function initLightbox(gallery, feed) {
       showPhoto(currentIndex + 1, 'next');
       return;
     }
-    // Достигнут конец загруженного — просим ленту догрузить страницу.
+    // Достигнут конец загруженного - просим ленту догрузить страницу.
     if (feed && feed.hasMore()) {
       const appended = await feed.loadMore();
       if (!lightbox.classList.contains('active')) return;
@@ -591,7 +590,7 @@ function initLightbox(gallery, feed) {
     }
   });
 
-  // Смена фото на тач-устройствах — интерактивным свайпом:
+  // Смена фото на тач-устройствах - интерактивным свайпом:
   // кадр следует за пальцем, отпускание листает или возвращает на место.
   setupSwipe(lightbox, lightboxImg, prevPhoto, nextPhoto, closeLightbox);
 }
@@ -620,7 +619,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
     if (!status) return;
     status.dataset.state = state;
     status.textContent = message;
-    // Ошибка даёт явную кнопку повтора вместо «прокрутите ещё раз»
+    // Ошибка даёт явную кнопку повтора вместо "прокрутите ещё раз"
     if (state === 'error') {
       const retry = document.createElement('button');
       retry.type = 'button';
@@ -647,7 +646,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
     window.removeEventListener('resize', maybeLoadMore);
   };
 
-  // Возвращает промис с true, если новые карточки добавлены —
+  // Возвращает промис с true, если новые карточки добавлены -
   // этим же методом пользуется лайтбокс при достижении конца списка.
   function loadMore() {
     if (inflight) return inflight;
@@ -662,7 +661,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
   async function fetchNextPage() {
     setFeedStatus('loading', 'Загружаем еще фото...');
 
-    // Keyset-курсор от последней карточки; page — фолбэк,
+    // Keyset-курсор от последней карточки; page - фолбэк,
     // если карточек с id нет.
     // data-ts передаётся вместе с id, чтобы курсор пережил удаление этого фото.
     const cards = gallery.querySelectorAll('.card[data-id]');
@@ -703,7 +702,7 @@ function setupInfiniteScroll(gallery, cardRevealer) {
           newCards.forEach(card => cardRevealer.observe(card));
           appended = newCards.length;
 
-          // Положение в ленте отражается в URL — «назад»/перезагрузка
+          // Положение в ленте отражается в URL - "назад"/перезагрузка
           // возвращают к текущей странице, а не в самый верх
           const loadedPages = Math.ceil(gallery.querySelectorAll('.card').length / 12);
           if (loadedPages > 1 && 'replaceState' in history) {
@@ -945,7 +944,7 @@ function initUploadForm() {
                   const ctx = canvas.getContext('2d');
                   canvas.width = 200;
                   canvas.height = 120;
-                  // cover-кроп вместо растягивания — портреты не плющит
+                  // cover-кроп вместо растягивания - портреты не плющит
                   const scale = Math.max(200 / img.width, 120 / img.height);
                   const width = img.width * scale;
                   const height = img.height * scale;
@@ -974,7 +973,7 @@ function initUploadForm() {
       statusBox.hidden = !message;
   }
 
-  // Файлы уходят последовательно, по одному запросу на файл —
+  // Файлы уходят последовательно, по одному запросу на файл -
   // виден прогресс, обрыв не теряет весь пакет, ретрай не дублирует
   // уже загруженное (сервер отсекает дубликаты по хешу).
   async function handleFormSubmit(e) {
@@ -1012,7 +1011,7 @@ function initUploadForm() {
                   body: formData,
               });
 
-              // Истёкшая сессия отвечает HTML-редиректом на логин —
+              // Истёкшая сессия отвечает HTML-редиректом на логин -
               // отправляем пользователя туда вместо SyntaxError из json().
               const contentType = response.headers.get('content-type') || '';
               if (response.redirected || !contentType.includes('application/json')) {
@@ -1048,7 +1047,7 @@ function initUploadForm() {
       preview.classList.remove('is-busy');
 
       if (!failedFiles.length) {
-          // Спиннер остаётся до ухода со страницы — редирект уже запущен
+          // Спиннер остаётся до ухода со страницы - редирект уже запущен
           window.location.href = redirectUrl;
           return;
       }
@@ -1080,11 +1079,11 @@ function preventDefaults(e) {
 }
 
 // Интерактивный свайп: тач-события приходят только с сенсорных экранов,
-// поэтому отдельная проверка «мобилка или нет» не нужна.
+// поэтому отдельная проверка "мобилка или нет" не нужна.
 function setupSwipe(lightbox, img, prev, next, close) {
   let startX = null;
   let startY = null;
-  let axis = null; // 'x' | 'y' — фиксируется по первому движению
+  let axis = null; // 'x' | 'y' - фиксируется по первому движению
   let tracking = false;
 
   const resetDrag = () => {
@@ -1109,7 +1108,7 @@ function setupSwipe(lightbox, img, prev, next, close) {
       const dX = e.touches[0].clientX - startX;
       const dY = e.touches[0].clientY - startY;
 
-      // Ось жеста определяется один раз — диагональ не даёт
+      // Ось жеста определяется один раз - диагональ не даёт
       // одновременно и листать, и закрывать.
       if (!axis) {
           if (Math.abs(dX) < 8 && Math.abs(dY) < 8) return;
@@ -1136,7 +1135,7 @@ function setupSwipe(lightbox, img, prev, next, close) {
       resetDrag();
 
       if (axis === 'x' && Math.abs(dX) > 60) {
-          // Палец увёл кадр влево — приходит следующий, и наоборот
+          // Палец увёл кадр влево - приходит следующий, и наоборот
           if (dX > 0) prev();
           else next();
           return;
@@ -1203,7 +1202,7 @@ function createGalleryCard(photo) {
 
   card.appendChild(img);
 
-  // Чип-подпись — только у снимков с настоящим названием (как в шаблоне)
+  // Чип-подпись - только у снимков с настоящим названием (как в шаблоне)
   if (photo.title || photo.alt_text) {
     const label = document.createElement('span');
     label.className = 'card-label';
@@ -1216,7 +1215,7 @@ function createGalleryCard(photo) {
 }
 
 // Идемпотентное завершение WAAPI-анимации: finished может не резолвиться
-// (фоновая вкладка, cancel) — страхуемся таймаутом, колбэк ровно один раз.
+// (фоновая вкладка, cancel) - страхуемся таймаутом, колбэк ровно один раз.
 function settleAnimation(animation, timeoutMs, done) {
   let called = false;
   const once = () => {

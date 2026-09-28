@@ -59,7 +59,7 @@ jobs:
           DJANGO_ENV: "prod"
           DEBUG: "0"
           DB_PASSWORD: "ci-deploy-check"
-          # Полностью «зелёная» prod-конфигурация для --fail-level WARNING
+          # Полностью "зелёная" prod-конфигурация для --fail-level WARNING
           SECURE_HSTS_SECONDS: "31536000"
           SECURE_HSTS_PRELOAD: "1"
         run: |

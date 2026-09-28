@@ -21,7 +21,7 @@ class Photo(models.Model):
     thumbnail_width = models.PositiveIntegerField(null=True, blank=True, editable=False)
     thumbnail_height = models.PositiveIntegerField(null=True, blank=True, editable=False)
     # SHA-256 оригинала для мягкой дедупликации повторных загрузок.
-    # null (а не "") — чтобы unique не конфликтовал на строках без хеша.
+    # null (а не "") - чтобы unique не конфликтовал на строках без хеша.
     content_hash = models.CharField(
         max_length=64,
         null=True,
@@ -53,7 +53,7 @@ class Photo(models.Model):
         return f"Photo #{self.pk or 'new'}"
 
     def file_dimensions(self, file_field):
-        """Размеры файла: из колонок БД, для оригинала — осторожно с диска."""
+        """Размеры файла: из колонок БД, для оригинала - осторожно с диска."""
         if not file_field:
             return None, None
         field_name = file_field.field.name

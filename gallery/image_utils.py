@@ -74,12 +74,12 @@ def make_image_variant_buffer(
     img_copy = img.copy()
     img_copy.thumbnail(size, Image.Resampling.LANCZOS)
     if fmt.upper() in {"JPEG", "JPG"} and img_copy.mode not in ("RGB", "L"):
-        # JPEG не умеет альфу — страховка на случай смены THUMBNAIL_FORMAT
+        # JPEG не умеет альфу - страховка на случай смены THUMBNAIL_FORMAT
         img_copy = img_copy.convert("RGB")
     buffer = BytesIO()
     save_kwargs = {"format": fmt, "quality": quality}
     if fmt.upper() == "WEBP":
-        save_kwargs["method"] = 4  # баланс скорость/размер (6 — самый медленный)
+        save_kwargs["method"] = 4  # баланс скорость/размер (6 - самый медленный)
     img_copy.save(buffer, **save_kwargs)
     buffer.seek(0)
     return buffer, img_copy.size
