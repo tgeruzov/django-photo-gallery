@@ -119,10 +119,34 @@ img {
 
 .wordmark {
   font-size: clamp(2.2rem, 1.1rem + 4.6vw, 6rem);
-  font-weight: 700;
+  font-weight: 500;
   line-height: 0.88;
   letter-spacing: -0.05em;
   text-decoration: none;
+}
+
+.wordmark-word {
+  display: inline-block;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+  margin-bottom: -0.06em;
+  vertical-align: bottom;
+}
+
+.wordmark-letter {
+  display: inline-block;
+  font-variation-settings: "wght" 500;
+  transition: font-variation-settings 0.25s var(--ease);
+}
+
+/* Буквы въезжают из-под маски снизу, по очереди */
+.js .wordmark-letter {
+  animation: letter-in 0.8s var(--ease) both;
+  animation-delay: calc(var(--i) * 32ms + 80ms);
+}
+
+@keyframes letter-in {
+  from { transform: translateY(105%); }
 }
 
 .wordmark::after {
@@ -184,11 +208,13 @@ img {
 
 .js .card img {
   opacity: 0;
-  transition: opacity 0.5s var(--ease);
+  transform: scale(1.08);
+  transition: opacity 0.7s var(--ease), transform 1.2s var(--ease);
 }
 
-.js .card.loaded img {
+.js .card.loaded.inview img {
   opacity: 1;
+  transform: none;
 }
 
 /* Наведение: акцентная линия вырастает вдоль нижнего края */
@@ -652,10 +678,8 @@ img {
 /* Страницы ошибок и футер */
 
 .error-code {
-  margin: 0 0 12px;
-  font: 500 13px/1 var(--mono);
-  letter-spacing: 0.08em;
-  color: var(--accent);
+  margin: 0 0 24px;
+  font: 500 clamp(2rem, 1.4rem + 3vw, 3.5rem)/1 var(--mono);
 }
 
 .error-page p:not(.error-code) {
@@ -672,6 +696,164 @@ img {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* Split Flap: табло из плиток, каждая перелистывается двумя створками */
+
+.flap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.flap-tile {
+  position: relative;
+  display: inline-block;
+  width: 1.15em;
+  height: 1.5em;
+  perspective: 6em;
+  color: var(--paper);
+}
+
+.flap-half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.flap-top,
+.flap-leaf--front {
+  top: 0;
+}
+
+.flap-bottom,
+.flap-leaf--back {
+  bottom: 0;
+}
+
+.flap-char {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.5em;
+  line-height: 1.5em;
+  text-align: center;
+}
+
+.flap-bottom .flap-char,
+.flap-leaf--back .flap-char {
+  top: -0.75em;
+}
+
+/* Линия сгиба посередине плитки */
+.flap-tile::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+  background: var(--paper);
+  opacity: 0.35;
+  z-index: 3;
+}
+
+.flap-leaf {
+  z-index: 2;
+  backface-visibility: hidden;
+}
+
+.flap-leaf--front {
+  transform-origin: bottom;
+  animation: flap-front calc(var(--flip-ms, 70ms) / 2) ease-in forwards;
+}
+
+.flap-leaf--back {
+  transform-origin: top;
+  transform: rotateX(90deg);
+  animation: flap-back calc(var(--flip-ms, 70ms) / 2) ease-out calc(var(--flip-ms, 70ms) / 2) forwards;
+}
+
+@keyframes flap-front {
+  to { transform: rotateX(-90deg); }
+}
+
+@keyframes flap-back {
+  to { transform: rotateX(0deg); }
+}
+
+.flap-sep {
+  padding: 0 0.3em;
+}
+
+.lightbox-counter.flap {
+  font-size: 16px;
+}
+
+/* Target Cursor: рамка автофокуса над сеткой */
+
+.has-target-cursor,
+.has-target-cursor .card {
+  cursor: none;
+}
+
+.target-cursor {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
+}
+
+.target-cursor.visible {
+  opacity: 1;
+}
+
+.target-cursor-dot,
+.target-cursor-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+
+.target-cursor-dot {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  background: var(--ink);
+  transition: background 0.15s var(--ease), scale 0.2s var(--ease);
+}
+
+.target-cursor-corner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ink);
+  transition: border-color 0.15s var(--ease);
+}
+
+.target-cursor-corner--tl { border-right: 0; border-bottom: 0; }
+.target-cursor-corner--tr { border-left: 0; border-bottom: 0; }
+.target-cursor-corner--br { border-left: 0; border-top: 0; }
+.target-cursor-corner--bl { border-right: 0; border-top: 0; }
+
+/* На снимке рамка и точка становятся акцентными, точка - светлой на фото */
+.target-cursor.locked .target-cursor-corner {
+  border-color: var(--accent);
+}
+
+.target-cursor.locked .target-cursor-dot {
+  background: var(--paper);
+}
+
+.target-cursor.pressed .target-cursor-dot {
+  scale: 0.6;
 }
 
 @media (prefers-reduced-motion: reduce) {
