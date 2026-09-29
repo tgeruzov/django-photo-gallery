@@ -1,7 +1,10 @@
 document.addEventListener('DOMContentLoaded', function () {
   initAlerts();
   initToTop();
+  initWordmark();
+  initFlaps();
   initGallery();
+  initTargetCursor();
   initUploadForm();
 });
 
@@ -51,8 +54,10 @@ function initGallery() {
   initLightbox(gallery, feed);
 }
 
-// Карточка проявляется, когда её превью загрузилось
+// Карточка проявляется, когда её превью загрузилось и она доехала до экрана
 function revealCard(card) {
+  if (inViewObserver) inViewObserver.observe(card);
+  else card.classList.add('inview');
   const img = card.querySelector('img');
   const show = () => card.classList.add('loaded');
   if (!img || (img.complete && img.naturalWidth)) {
@@ -79,7 +84,8 @@ function initLightbox(gallery, feed) {
   const closeBtn = lightbox.querySelector('.lightbox-close');
   const prevBtn = lightbox.querySelector('.lightbox-prev');
   const nextBtn = lightbox.querySelector('.lightbox-next');
-  const counter = lightbox.querySelector('.lightbox-counter');
+  const counterEl = lightbox.querySelector('.lightbox-counter');
+  const counter = counterEl ? createSplitFlap(counterEl) : null;
   const zoom = setupGestures(lightbox, lightboxImg, {
     prev: prevPhoto,
     next: nextPhoto,
@@ -110,9 +116,8 @@ function initLightbox(gallery, feed) {
 
   function updateCounter() {
     if (!counter) return;
-    counter.textContent = currentIndex >= 0 && allPhotos.length
-      ? `${pad(currentIndex + 1)} / ${pad(allPhotos.length)}`
-      : '';
+    if (currentIndex < 0 || !allPhotos.length) return;
+    counter.set(`${pad(currentIndex + 1)} / ${pad(allPhotos.length)}`);
   }
 
   function preloadNeighbors(index) {
@@ -958,6 +963,364 @@ function initUploadForm() {
       submitBtn.textContent = `Повторить (${failedFiles.length})`;
   }
 }
+
+// Эффекты по мотивам React Bits (reactbits.dev), переписанные без React и GSAP
+
+const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+
+// Split Text + Variable Proximity: буквы имени въезжают из-под маски,
+// а рядом с курсором становятся жирнее (вариативная ось wght у Geist).
+function initWordmark() {
+  const wordmark = document.querySelector('.wordmark');
+  const source = wordmark && wordmark.querySelector('.wordmark-text');
+  if (!source) return;
+
+  const FROM = 500;
+  const TO = 800;
+  const RADIUS = 220;
+  const letters = [];
+  const label = source.textContent.trim();
+  source.textContent = '';
+  wordmark.setAttribute('aria-label', label);
+
+  label.split(' ').forEach((word, wordIndex) => {
+    if (wordIndex) source.append(' ');
+    const wordEl = document.createElement('span');
+    wordEl.className = 'wordmark-word';
+    wordEl.setAttribute('aria-hidden', 'true');
+    word.split('').forEach(char => {
+      const letter = document.createElement('span');
+      letter.className = 'wordmark-letter';
+      letter.textContent = char;
+      letter.style.setProperty('--i', String(letters.length));
+      wordEl.appendChild(letter);
+      letters.push(letter);
+    });
+    source.appendChild(wordEl);
+  });
+
+  if (!finePointer.matches) return;
+
+  let pointer = null;
+  let scheduled = false;
+
+  const update = () => {
+    scheduled = false;
+    letters.forEach(letter => {
+      let weight = FROM;
+      if (pointer) {
+        const rect = letter.getBoundingClientRect();
+        const distance = Math.hypot(
+          pointer.x - (rect.left + rect.width / 2),
+          pointer.y - (rect.top + rect.height / 2)
+        );
+        // Гауссов спад: плавный пик у курсора без резкой границы радиуса
+        const strength = Math.exp(-((distance / (RADIUS / 2)) ** 2) / 2);
+        weight = FROM + (TO - FROM) * strength;
+      }
+      letter.style.fontVariationSettings = `'wght' ${weight.toFixed(0)}`;
+    });
+  };
+
+  window.addEventListener('pointermove', e => {
+    pointer = { x: e.clientX, y: e.clientY };
+    if (!scheduled) {
+      scheduled = true;
+      requestAnimationFrame(update);
+    }
+  }, { passive: true });
+
+  document.documentElement.addEventListener('pointerleave', () => {
+    pointer = null;
+    requestAnimationFrame(update);
+  });
+}
+
+// Target Cursor: над фото курсор становится рамкой автофокуса,
+// четыре уголка защёлкиваются на снимке. Только мышь, только сетка.
+function initTargetCursor() {
+  const gallery = document.getElementById('gallery');
+  if (!gallery || !finePointer.matches) return;
+
+  const CORNER = 14;
+  const INSET = 6; // уголки чуть снаружи снимка
+  const SPIN_MS = 2400;
+
+  const root = document.createElement('div');
+  root.className = 'target-cursor';
+  root.setAttribute('aria-hidden', 'true');
+  const dot = document.createElement('span');
+  dot.className = 'target-cursor-dot';
+  const corners = ['tl', 'tr', 'br', 'bl'].map(name => {
+    const corner = document.createElement('span');
+    corner.className = `target-cursor-corner target-cursor-corner--${name}`;
+    root.appendChild(corner);
+    return corner;
+  });
+  root.appendChild(dot);
+  document.body.appendChild(root);
+  gallery.classList.add('has-target-cursor');
+
+  const mouse = { x: -100, y: -100 };
+  const pos = { x: -100, y: -100 };
+  const cornerPos = corners.map(() => ({ x: -100, y: -100, r: 0 }));
+  // Углы уголков по кругу: в покое рамка крутится вокруг точки
+  const idleAngles = [225, 315, 45, 135];
+  const idleRadius = CORNER * 1.4;
+  let target = null;
+  let visible = false;
+  let running = false;
+  let spin = 0;
+  let last = performance.now();
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  function frame(now) {
+    const dt = Math.min(64, now - last);
+    last = now;
+    const follow = 1 - Math.pow(0.001, dt / 120);
+    pos.x = lerp(pos.x, mouse.x, follow);
+    pos.y = lerp(pos.y, mouse.y, follow);
+    dot.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+
+    if (target && !target.isConnected) target = null;
+    if (!reduceMotion.matches && !target) spin = (spin + (dt / SPIN_MS) * 360) % 360;
+
+    let goals;
+    if (target) {
+      const rect = target.getBoundingClientRect();
+      // Лёгкий параллакс: рамка чуть тянется за курсором внутри снимка
+      const px = (pos.x - (rect.left + rect.width / 2)) * 0.03;
+      const py = (pos.y - (rect.top + rect.height / 2)) * 0.03;
+      goals = [
+        { x: rect.left - INSET, y: rect.top - INSET },
+        { x: rect.right + INSET - CORNER, y: rect.top - INSET },
+        { x: rect.right + INSET - CORNER, y: rect.bottom + INSET - CORNER },
+        { x: rect.left - INSET, y: rect.bottom + INSET - CORNER },
+      ].map(g => ({ x: g.x + px, y: g.y + py, r: 0 }));
+    } else {
+      goals = idleAngles.map(angle => {
+        const a = ((angle + spin) * Math.PI) / 180;
+        return {
+          x: pos.x + Math.cos(a) * idleRadius - CORNER / 2,
+          y: pos.y + Math.sin(a) * idleRadius - CORNER / 2,
+          r: spin,
+        };
+      });
+    }
+
+    const snap = 1 - Math.pow(0.001, dt / (target ? 160 : 60));
+    corners.forEach((corner, i) => {
+      const c = cornerPos[i];
+      c.x = lerp(c.x, goals[i].x, snap);
+      c.y = lerp(c.y, goals[i].y, snap);
+      // Поворот по кратчайшему пути, чтобы уголки не делали лишний оборот
+      const delta = ((goals[i].r - c.r + 540) % 360) - 180;
+      c.r = target ? lerp(c.r, c.r + delta, snap) : goals[i].r;
+      corner.style.transform = `translate(${c.x}px, ${c.y}px) rotate(${c.r}deg)`;
+    });
+
+    if (visible) {
+      requestAnimationFrame(frame);
+    } else {
+      running = false;
+    }
+  }
+
+  function show() {
+    if (!visible) {
+      visible = true;
+      root.classList.add('visible');
+      // Курсор появляется на месте мыши, а не прилетает из угла экрана
+      pos.x = mouse.x;
+      pos.y = mouse.y;
+      cornerPos.forEach(c => {
+        c.x = mouse.x - CORNER / 2;
+        c.y = mouse.y - CORNER / 2;
+      });
+    }
+    if (!running) {
+      running = true;
+      last = performance.now();
+      requestAnimationFrame(frame);
+    }
+  }
+
+  function hide() {
+    visible = false;
+    target = null;
+    root.classList.remove('visible', 'locked');
+  }
+
+  document.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+    const over = document.elementFromPoint(e.clientX, e.clientY);
+    if (!over || !gallery.contains(over)) {
+      hide();
+      return;
+    }
+    const card = over.closest('.card');
+    target = card || null;
+    root.classList.toggle('locked', Boolean(card));
+    show();
+  }, { passive: true });
+
+  // Прокрутка двигает фото под неподвижной мышью - пересчитываем цель
+  window.addEventListener('scroll', () => {
+    if (!visible) return;
+    const over = document.elementFromPoint(mouse.x, mouse.y);
+    if (!over || !gallery.contains(over)) {
+      hide();
+      return;
+    }
+    target = over.closest('.card');
+    root.classList.toggle('locked', Boolean(target));
+  }, { passive: true });
+
+  document.addEventListener('pointerdown', () => root.classList.add('pressed'));
+  document.addEventListener('pointerup', () => root.classList.remove('pressed'));
+  document.documentElement.addEventListener('pointerleave', hide);
+}
+
+// Split Flap: механическое табло, каждый символ перелистывается
+// через несколько случайных цифр к нужному.
+function createSplitFlap(el, { flipMs = 70, stagger = 35, flips = 5 } = {}) {
+  const DIGITS = '0123456789';
+  let tiles = [];
+  let current = '';
+  let raf = null;
+
+  const isFlapChar = ch => /[0-9A-Za-zА-Яа-я]/.test(ch);
+
+  function build(text) {
+    el.textContent = '';
+    el.classList.add('flap');
+    tiles = text.split('').map(ch => {
+      if (!isFlapChar(ch)) {
+        const sep = document.createElement('span');
+        sep.className = 'flap-sep';
+        sep.textContent = ch === ' ' ? ' ' : ch;
+        el.appendChild(sep);
+        return null;
+      }
+      const tile = document.createElement('span');
+      tile.className = 'flap-tile';
+      tile.innerHTML =
+        '<span class="flap-half flap-top"><span class="flap-char"></span></span>' +
+        '<span class="flap-half flap-bottom"><span class="flap-char"></span></span>';
+      el.appendChild(tile);
+      setTile(tile, ch, ch);
+      return tile;
+    });
+  }
+
+  function setTile(tile, top, bottom) {
+    tile.querySelector('.flap-top .flap-char').textContent = top;
+    tile.querySelector('.flap-bottom .flap-char').textContent = bottom;
+  }
+
+  // Один перелёт: верхняя створка со старым символом падает, нижняя с новым встаёт
+  function flipTile(tile, from, to) {
+    tile.querySelectorAll('.flap-leaf').forEach(leaf => leaf.remove());
+    setTile(tile, to, from);
+    const front = document.createElement('span');
+    front.className = 'flap-half flap-leaf flap-leaf--front';
+    front.innerHTML = `<span class="flap-char">${from}</span>`;
+    const back = document.createElement('span');
+    back.className = 'flap-half flap-leaf flap-leaf--back';
+    back.innerHTML = `<span class="flap-char">${to}</span>`;
+    tile.append(front, back);
+    // animationend может не прийти в фоновой вкладке - страхуемся таймером
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      if (front.isConnected) setTile(tile, to, to);
+      front.remove();
+      back.remove();
+    };
+    back.addEventListener('animationend', settle, { once: true });
+    setTimeout(settle, flipMs + 40);
+  }
+
+  function set(text, { animate = true } = {}) {
+    if (raf) cancelAnimationFrame(raf);
+    const sameShape = text.length === current.length &&
+      text.split('').every((ch, i) => isFlapChar(ch) === isFlapChar(current[i]));
+    if (!sameShape) {
+      build(animate ? text.replace(/[0-9]/g, '0') : text);
+      if (!animate) {
+        current = text;
+        el.setAttribute('aria-label', text);
+        return;
+      }
+      current = text.replace(/[0-9]/g, '0');
+    }
+    el.setAttribute('aria-label', text);
+    el.style.setProperty('--flip-ms', `${flipMs}ms`);
+
+    if (!animate || reduceMotion.matches) {
+      text.split('').forEach((ch, i) => tiles[i] && setTile(tiles[i], ch, ch));
+      current = text;
+      return;
+    }
+
+    const plans = text.split('').map((to, i) => {
+      const from = current[i];
+      if (!tiles[i] || from === to) return null;
+      const steps = Array.from({ length: flips }, () => DIGITS[Math.floor(Math.random() * 10)]);
+      steps.push(to);
+      return { tile: tiles[i], from, steps, start: i * stagger, step: -1 };
+    }).filter(Boolean);
+    current = text;
+    if (!plans.length) return;
+
+    const began = performance.now();
+    const tick = now => {
+      let pending = false;
+      plans.forEach(plan => {
+        const step = Math.floor((now - began - plan.start) / flipMs);
+        if (step < 0) {
+          pending = true;
+          return;
+        }
+        if (step < plan.steps.length) pending = true;
+        const index = Math.min(step, plan.steps.length - 1);
+        if (index !== plan.step) {
+          const from = plan.step < 0 ? plan.from : plan.steps[plan.step];
+          plan.step = index;
+          flipTile(plan.tile, from, plan.steps[index]);
+        }
+      });
+      raf = pending ? requestAnimationFrame(tick) : null;
+    };
+    raf = requestAnimationFrame(tick);
+  }
+
+  return { set };
+}
+
+function initFlaps() {
+  document.querySelectorAll('[data-split-flap]').forEach(el => {
+    const flap = createSplitFlap(el, { flipMs: 90, stagger: 120, flips: 7 });
+    const text = el.textContent.trim();
+    flap.set(text);
+  });
+}
+
+// Появление фото по мотивам Animated Content: снимок проявляется и оседает
+// из лёгкого увеличения, когда доезжает до экрана
+const inViewObserver = 'IntersectionObserver' in window
+  ? new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('inview');
+        inViewObserver.unobserve(entry.target);
+      });
+    }, { rootMargin: '0px 0px -40px 0px' })
+  : null;
 
 function preventDefaults(e) {
   e.preventDefault();

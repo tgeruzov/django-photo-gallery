@@ -68,7 +68,7 @@
   <body>
     <a class="skip-link" href="#main">К содержимому</a>
     <header class="masthead">
-      <a class="wordmark" href="/">{{ seo_site_name|default:"Timur Geruzov" }}</a>
+      <a class="wordmark" href="/"><span class="wordmark-text">{{ seo_site_name|default:"Timur Geruzov" }}</span></a>
       {% if user.is_staff %}
       <a class="masthead-link" href="{% url 'upload_photo' %}">Загрузить</a>
       {% endif %}
