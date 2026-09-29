@@ -9,66 +9,46 @@
 {% block content %}
   <h1 class="visually-hidden">{{ page_heading|default:"Фотогалерея" }}</h1>
 
-  {% if messages %}
-  <div class="container page-messages">
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+  {% endfor %}
+
+  <div class="gallery" id="gallery">
+    {% for photo in photos_page %}
+    {% with sources=photo.card_sources dims=photo.display_dimensions %}
+    {% if sources %}
+    <button
+      class="card"
+      type="button"
+      style="--r: {{ photo.display_ratio|stringformat:'s' }}"
+      data-id="{{ photo.id }}"
+      data-ts="{{ photo.uploaded_at.isoformat }}"
+      aria-label="Открыть фото: {{ photo.display_label }}"
+    >
+      <img
+        src="{{ sources.0.url }}"
+        alt="{{ photo.display_label }}"
+        data-full="{{ sources.1.url }}"
+        data-medium="{{ photo.medium_url }}"
+        {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
+        loading="{% if forloop.counter <= 6 %}eager{% else %}lazy{% endif %}"
+        decoding="async"
+        {% if forloop.first %}fetchpriority="high"{% endif %}
+      />
+    </button>
+    {% endif %}
+    {% endwith %}
+    {% empty %}
+    <div class="empty-state">
+      <p class="empty-state-title">Пока пусто</p>
+      {% if user.is_staff %}
+      <a class="button" href="{% url 'upload_photo' %}">Загрузить фото</a>
+      {% endif %}
+    </div>
     {% endfor %}
   </div>
-  {% endif %}
 
-  <div class="container">
-    <div class="gallery" id="gallery">
-      {% for photo in photos_page %}
-{% with photo_label=photo.display_label sources=photo.card_sources dims=photo.display_dimensions %}
-  {% if sources %}
-  <button class="card" type="button" data-id="{{ photo.id }}" data-ts="{{ photo.uploaded_at.isoformat }}" aria-label="Открыть фото: {{ photo_label }}">
-    <img
-      loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
-      decoding="async"
-      fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
-      src="{{ sources.0.url }}"
-      alt="{{ photo_label }}"
-      data-full="{{ sources.1.url }}"
-      {% if dims.0 and dims.1 %}width="{{ dims.0 }}" height="{{ dims.1 }}"{% endif %}
-    />
-    {% if photo.title or photo.alt_text %}
-    <span class="card-label" aria-hidden="true">{{ photo_label }}</span>
-    {% endif %}
-  </button>
-  {% else %}
-  <div class="card card-empty">
-    <div class="no-image-placeholder">Изображение недоступно</div>
-  </div>
-  {% endif %}
-{% endwith %}
-{% empty %} {% if not request.GET.page or request.GET.page == '1' %}
-<div class="empty-state">
-  <div class="empty-state-icon" aria-hidden="true">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <circle cx="9" cy="9" r="2" />
-      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-    </svg>
-  </div>
-  <p class="empty-state-title">Нет загруженных изображений</p>
-  <p class="empty-state-hint">Здесь появятся фотографии, как только они будут опубликованы.</p>
-  {% if user.is_staff %}
-  <a class="empty-state-cta" href="{% url 'upload_photo' %}">Загрузить фото</a>
-  {% endif %}
-</div>
-{% endif %} {% endfor %}
-    </div>
-  </div>
-
-  <div
-    class="gallery-feed-status"
-    id="gallery-feed-status"
-    aria-live="polite"
-    data-state="idle"
-    hidden
-  ></div>
-
+  <div class="feed-status" id="gallery-feed-status" aria-live="polite" hidden></div>
   <div
     class="gallery-sentinel"
     id="gallery-sentinel"
@@ -77,31 +57,17 @@
     data-has-next="{% if photos_page.has_next %}true{% else %}false{% endif %}"
   ></div>
 
-  <div
-    class="lightbox"
-    id="lightbox"
-    role="dialog"
-    aria-modal="true"
-    aria-label="Просмотр фото"
-    aria-hidden="true"
-  >
-    <button class="lightbox-close" type="button" aria-label="Закрыть просмотр">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <path d="M18 6 6 18M6 6l12 12" />
-      </svg>
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Просмотр фото" aria-hidden="true">
+    <div class="lightbox-bar">
+      <span class="lightbox-counter"></span>
+      <button class="lightbox-close" type="button">Закрыть</button>
+    </div>
+    <img alt="" />
+    <button class="lightbox-nav lightbox-prev" type="button" aria-label="Предыдущее фото">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
     </button>
-    <button class="lightbox-prev" type="button" aria-label="Предыдущее фото">
-      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="m15 18-6-6 6-6" />
-      </svg>
+    <button class="lightbox-nav lightbox-next" type="button" aria-label="Следующее фото">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
     </button>
-    <img alt="Увеличенное изображение" />
-    <button class="lightbox-next" type="button" aria-label="Следующее фото">
-      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="m9 18 6-6-6-6" />
-      </svg>
-    </button>
-    <div class="lightbox-counter"></div>
-    <div class="lightbox-hint">Листайте свайпом, свайп вниз закрывает</div>
   </div>
 {% endblock %}

@@ -12,6 +12,10 @@ class Photo(models.Model):
     thumbnail = models.ImageField(
         upload_to="thumbnails/%Y/%m/%d/", null=True, blank=True, verbose_name="Миниатюра"
     )
+    # Версия для лайтбокса на телефонах: 2560px там избыточны
+    medium_image = models.ImageField(
+        upload_to="medium/%Y/%m/%d/", null=True, blank=True, verbose_name="Средняя версия"
+    )
     # Размеры вариантов денормализованы, чтобы не открывать файлы из storage
     # на каждый запрос. Заполняются сервисным слоем при генерации вариантов.
     # Намеренно НЕ через width_field/height_field: их post_init-хук читает файл
@@ -20,6 +24,8 @@ class Photo(models.Model):
     optimized_height = models.PositiveIntegerField(null=True, blank=True, editable=False)
     thumbnail_width = models.PositiveIntegerField(null=True, blank=True, editable=False)
     thumbnail_height = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    medium_width = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    medium_height = models.PositiveIntegerField(null=True, blank=True, editable=False)
     # SHA-256 оригинала для мягкой дедупликации повторных загрузок.
     # null (а не "") - чтобы unique не конфликтовал на строках без хеша.
     content_hash = models.CharField(
@@ -61,6 +67,8 @@ class Photo(models.Model):
             return self.thumbnail_width, self.thumbnail_height
         if field_name == "optimized_image" and self.optimized_width and self.optimized_height:
             return self.optimized_width, self.optimized_height
+        if field_name == "medium_image" and self.medium_width and self.medium_height:
+            return self.medium_width, self.medium_height
         try:
             return file_field.width, file_field.height
         except (ValueError, OSError):
@@ -82,6 +90,23 @@ class Photo(models.Model):
     @property
     def display_dimensions(self):
         return self.file_dimensions(self.display_file)
+
+    @property
+    def has_all_variants(self):
+        return bool(self.optimized_image and self.medium_image and self.thumbnail)
+
+    @property
+    def display_ratio(self):
+        """Ширина к высоте превью для раскладки сетки; 1, если размер неизвестен."""
+        width, height = self.display_dimensions
+        return round(width / height, 4) if width and height else 1
+
+    @property
+    def medium_url(self):
+        try:
+            return self.medium_image.url if self.medium_image else ""
+        except ValueError:
+            return ""
 
     @property
     def display_label(self):

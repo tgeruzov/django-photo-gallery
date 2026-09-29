@@ -133,7 +133,7 @@ def serialize_photo(photo):
         "uploaded_at": photo.uploaded_at.isoformat(),
         "url": preview_url,
         "full_url": full_url,
-        "title": photo.title or photo.display_label,
+        "medium_url": photo.medium_url,
         "alt_text": photo.display_label,
         "width": width,
         "height": height,
