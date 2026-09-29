@@ -17,6 +17,8 @@ THUMBNAIL_SIZE = (800, 800)
 THUMBNAIL_QUALITY = 82
 OPTIMIZED_IMAGE_SIZE = (2560, 2560)
 OPTIMIZED_IMAGE_QUALITY = 85
+MEDIUM_IMAGE_SIZE = (1600, 1600)
+MEDIUM_IMAGE_QUALITY = 84
 
 
 class ImageProcessingError(Exception):
@@ -139,23 +141,22 @@ def build_missing_variants(photo: Photo) -> dict | None:
     source = photo.image or photo.optimized_image
     if not source:
         return None
-    missing_optimized = not photo.optimized_image
-    missing_thumbnail = not photo.thumbnail
-    if not (missing_optimized or missing_thumbnail or should_delete_original(photo)):
+    specs = {
+        "optimized_image": (OPTIMIZED_IMAGE_SIZE, OPTIMIZED_IMAGE_QUALITY, "_optimized"),
+        "medium_image": (MEDIUM_IMAGE_SIZE, MEDIUM_IMAGE_QUALITY, "_medium"),
+        "thumbnail": (THUMBNAIL_SIZE, THUMBNAIL_QUALITY, "_thumb"),
+    }
+    missing = [name for name in specs if not getattr(photo, name)]
+    if not (missing or should_delete_original(photo)):
         return None
 
     variants = {}
-    if missing_optimized or missing_thumbnail:
+    if missing:
         with source.open("rb") as fh:
             img = open_image(fh)
-        if missing_optimized:
-            variants["optimized_image"] = make_webp(
-                img, OPTIMIZED_IMAGE_SIZE, OPTIMIZED_IMAGE_QUALITY, source.name, "_optimized"
-            )
-        if missing_thumbnail:
-            variants["thumbnail"] = make_webp(
-                img, THUMBNAIL_SIZE, THUMBNAIL_QUALITY, source.name, "_thumb"
-            )
+        for name in missing:
+            size, quality, suffix = specs[name]
+            variants[name] = make_webp(img, size, quality, source.name, suffix)
     return variants
 
 
@@ -164,6 +165,7 @@ def apply_variants(photo: Photo, variants: dict) -> bool:
     dimension_fields = {
         "optimized_image": ("optimized_width", "optimized_height"),
         "thumbnail": ("thumbnail_width", "thumbnail_height"),
+        "medium_image": ("medium_width", "medium_height"),
     }
     update_fields = []
     for field_name, content in variants.items():
@@ -177,7 +179,7 @@ def apply_variants(photo: Photo, variants: dict) -> bool:
         setattr(photo, height_field, content.image_dimensions[1])
         update_fields.extend([field_name, width_field, height_field])
 
-    if should_delete_original(photo) and photo.optimized_image and photo.thumbnail:
+    if should_delete_original(photo) and photo.has_all_variants:
         # Оригинал удаляется только после коммита: при откате он должен остаться
         storage, original_name = photo.image.storage, photo.image.name
         photo.image = ""

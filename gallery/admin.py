@@ -32,6 +32,7 @@ class PhotoAdmin(admin.ModelAdmin):
                     "alt_text",
                     "image",
                     "optimized_image",
+                    "medium_image",
                     "thumbnail",
                     "uploaded_at",
                     "preview",

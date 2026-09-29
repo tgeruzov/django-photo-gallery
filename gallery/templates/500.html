@@ -4,10 +4,10 @@
 {% block meta_robots %}noindex, nofollow{% endblock %}
 
 {% block content %}
-  <div class="container error-page">
-    <p class="error-code" aria-hidden="true">500</p>
-    <h1>Что-то пошло не так</h1>
-    <p>Мы уже разбираемся. Попробуйте обновить страницу через минуту.</p>
-    <a class="error-home-link" href="/">В галерею</a>
-  </div>
+  <section class="error-page">
+    <p class="error-code">500</p>
+    <h1 class="page-title">Ошибка сервера</h1>
+    <p>Что-то сломалось на нашей стороне. Попробуйте обновить страницу позже.</p>
+    <a class="button" href="/">В галерею</a>
+  </section>
 {% endblock %}

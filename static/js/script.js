@@ -1,10 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
-  setupThemeSwitcher();
-  initHeaderBehavior();
   initAlerts();
+  initToTop();
   initGallery();
   initUploadForm();
 });
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 // Сообщения закрываются крестиком и сами исчезают через 6 секунд
 function initAlerts() {
@@ -28,297 +29,96 @@ function initAlerts() {
   });
 }
 
-function initHeaderBehavior() {
-  const topbar = document.querySelector('.topbar');
-  const scrollTopBtn = document.querySelector('.scroll-top');
+function initToTop() {
+  const button = document.querySelector('.to-top');
+  if (!button) return;
 
-  // Шапка sticky и живёт в потоке - разделитель появляется только
-  // после начала скролла; здесь же обновляются индикатор прокрутки и кнопка "наверх".
-  const syncScroll = () => {
-    const y = window.scrollY;
-    if (topbar) {
-      topbar.classList.toggle('is-scrolled', y > 4);
-    }
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    document.documentElement.style.setProperty(
-      '--scroll-progress',
-      max > 0 ? String(Math.min(1, y / max)) : '0'
-    );
-    if (scrollTopBtn) {
-      scrollTopBtn.classList.toggle('visible', y > 1200);
-    }
-  };
-  window.addEventListener('scroll', syncScroll, { passive: true });
-  syncScroll();
+  const sync = () => button.classList.toggle('visible', window.scrollY > 1200);
+  window.addEventListener('scroll', sync, { passive: true });
+  sync();
 
-  if (scrollTopBtn) {
-    scrollTopBtn.addEventListener('click', () => {
-      const reduceMotion =
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
-    });
-  }
+  button.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+  });
 }
 
 function initGallery() {
   const gallery = document.getElementById('gallery');
   if (!gallery) return;
 
-  const cardRevealer = initLazyLoad(gallery);
-  const feed = setupInfiniteScroll(gallery, cardRevealer);
-  initCardTilt(gallery);
+  gallery.querySelectorAll('.card').forEach(revealCard);
+  const feed = setupInfiniteScroll(gallery);
   initLightbox(gallery, feed);
 }
 
-// 3D-наклон карточки за курсором + позиция блика. Один делегированный
-// слушатель на галерею; углы уходят в CSS-переменные (применяет CSS).
-function initCardTilt(gallery) {
-  const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  if (!finePointer.matches || reduceMotion.matches) return;
-
-  const MAX_DEG = 3.2;
-
-  const resetTilt = (card) => {
-    card.style.removeProperty('--rx');
-    card.style.removeProperty('--ry');
-  };
-
-  gallery.addEventListener('pointermove', (e) => {
-    const card = e.target.closest('.card');
-    if (!card || card.classList.contains('card-empty')) return;
-    const rect = card.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const px = (e.clientX - rect.left) / rect.width;
-    const py = (e.clientY - rect.top) / rect.height;
-    card.style.setProperty('--px', px.toFixed(3));
-    card.style.setProperty('--py', py.toFixed(3));
-    card.style.setProperty('--rx', `${((px - 0.5) * MAX_DEG).toFixed(2)}deg`);
-    card.style.setProperty('--ry', `${((0.5 - py) * MAX_DEG).toFixed(2)}deg`);
-  });
-
-  gallery.addEventListener('pointerout', (e) => {
-    const card = e.target.closest('.card');
-    if (card && !card.contains(e.relatedTarget)) {
-      resetTilt(card);
-    }
-  });
-
-  // Перед zoom-полётом в лайтбокс карточка выравнивается,
-  // чтобы FLIP мерил ровный прямоугольник
-  gallery.addEventListener('click', (e) => {
-    const card = e.target.closest('.card');
-    if (card) resetTilt(card);
-  }, true);
-}
-
-function setupThemeSwitcher() {
-  const themeBtn = document.querySelector('.theme-toggle');
-  if (!themeBtn) return;
-
-  // Начальная тема применяется инлайн-скриптом в <head> (класс на <html>),
-  // чтобы light-пользователь не видел вспышку тёмной темы.
-  const root = document.documentElement;
-
-  const syncThemeButtonState = () => {
-      const isLight = root.classList.contains('light');
-      themeBtn.setAttribute('aria-pressed', String(isLight));
-      themeBtn.setAttribute('aria-label', isLight ? 'Переключить на темную тему' : 'Переключить на светлую тему');
-  };
-
-  syncThemeButtonState();
-
-  themeBtn.addEventListener('click', () => {
-      const applyTheme = () => {
-          root.classList.toggle('light');
-          const isLight = root.classList.contains('light');
-          localStorage.setItem('darkMode', !isLight);
-          syncThemeButtonState();
-      };
-
-      const reduceMotion =
-          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (!document.startViewTransition || reduceMotion) {
-          applyTheme();
-          return;
-      }
-
-      // Новая тема раскрывается кругом от кнопки-переключателя.
-      // Класс theme-switching отключает дефолтный кросс-фейд только
-      // на время этого перехода (см. CSS), навигационный - не трогает.
-      const rect = themeBtn.getBoundingClientRect();
-      const x = rect.left + rect.width / 2;
-      const y = rect.top + rect.height / 2;
-      const radius = Math.hypot(
-          Math.max(x, window.innerWidth - x),
-          Math.max(y, window.innerHeight - y)
-      );
-
-      root.classList.add('theme-switching');
-      const transition = document.startViewTransition(applyTheme);
-      transition.ready
-          .then(() => {
-              root.animate(
-                  {
-                      clipPath: [
-                          `circle(0px at ${x}px ${y}px)`,
-                          `circle(${radius}px at ${x}px ${y}px)`,
-                      ],
-                  },
-                  {
-                      duration: 450,
-                      easing: 'ease-in-out',
-                      pseudoElement: '::view-transition-new(root)',
-                  }
-              );
-          })
-          .catch(() => {}); // переход мог быть пропущен (фоновая вкладка)
-      transition.finished.finally(() => {
-          root.classList.remove('theme-switching');
-      });
-  });
-}
-
-function initLazyLoad(container) {
-  const revealCard = (card) => {
-    if (!card || card.classList.contains('loaded')) return;
-
-    const image = card.querySelector('img');
-    const markLoaded = () => {
-      requestAnimationFrame(() => {
-        card.classList.add('loaded');
-      });
-    };
-
-    if (!image || image.complete) {
-      markLoaded();
-      return;
-    }
-
-    const onDone = () => {
-      image.removeEventListener('load', onDone);
-      image.removeEventListener('error', onDone);
-      markLoaded();
-    };
-
-    image.addEventListener('load', onDone, { once: true });
-    image.addEventListener('error', onDone, { once: true });
-  };
-
-  const reduceMotion =
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const observer = 'IntersectionObserver' in window
-    ? new IntersectionObserver((entries) => {
-        // Пачка карточек появляется каскадом, а не одним миганием
-        const visible = entries.filter(entry => entry.isIntersecting);
-        visible.forEach((entry, index) => {
-          observer.unobserve(entry.target);
-          if (reduceMotion) {
-            revealCard(entry.target);
-          } else {
-            setTimeout(() => revealCard(entry.target), index * 40);
-          }
-        });
-      }, { rootMargin: '0px 0px 160px 0px', threshold: 0.01 })
-    : null;
-
-  const api = {
-    observe(card) {
-      if (!card || card.dataset.revealObserved === 'true') return;
-      card.dataset.revealObserved = 'true';
-
-      if (!observer) {
-        revealCard(card);
-        return;
-      }
-
-      observer.observe(card);
-    },
-    disconnect() {
-      if (observer) {
-        observer.disconnect();
-      }
-    },
-  };
-
-  container.querySelectorAll('.card:not(.loaded)').forEach(api.observe);
-  return api;
+// Карточка проявляется, когда её превью загрузилось
+function revealCard(card) {
+  const img = card.querySelector('img');
+  const show = () => card.classList.add('loaded');
+  if (!img || (img.complete && img.naturalWidth)) {
+    show();
+    return;
+  }
+  img.addEventListener('load', show, { once: true });
+  img.addEventListener('error', show, { once: true });
 }
 
 function initLightbox(gallery, feed) {
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = lightbox ? lightbox.querySelector('img') : null;
-  if (!lightbox || !lightboxImg || !gallery) return;
+  if (!lightbox || !lightboxImg) return;
 
   // Лайтбокс работает по уже загруженным карточкам и догружает
-  // следующую страницу ленты по необходимости - без выкачивания всей
-  // библиотеки метаданных при первом клике.
+  // следующую страницу ленты, когда листание доходит до конца.
   let allPhotos = [];
   let currentIndex = -1;
   let lastFocused = null;
+  let closing = false;
+  const ENLARGE_MS = 300;
 
   const closeBtn = lightbox.querySelector('.lightbox-close');
   const prevBtn = lightbox.querySelector('.lightbox-prev');
   const nextBtn = lightbox.querySelector('.lightbox-next');
   const counter = lightbox.querySelector('.lightbox-counter');
+  const zoom = setupGestures(lightbox, lightboxImg, {
+    prev: prevPhoto,
+    next: nextPhoto,
+    close: closeLightbox,
+  });
 
   function getVisiblePhotos() {
     return Array.from(gallery.querySelectorAll('.card img'))
       .map(img => ({
-          url: img.src,
-          full_url: img.getAttribute('data-full'),
-          title: img.alt || '',
-          el: img, // источник и цель перехода открытия/закрытия
+        url: img.src,
+        full_url: img.dataset.full,
+        medium_url: img.dataset.medium || '',
+        alt: img.alt || '',
+        el: img, // источник и цель перехода открытия/закрытия
       }))
       .filter(photo => photo.url && photo.full_url);
+  }
+
+  // Телефону хватает версии 1600px, 2560px нужны только большим экранам
+  function pickFullUrl(photo) {
+    const needed = Math.max(window.innerWidth, window.innerHeight) * (window.devicePixelRatio || 1);
+    return photo.medium_url && needed <= 1700 ? photo.medium_url : photo.full_url;
+  }
+
+  function pad(n) {
+    return String(n).padStart(2, '0');
   }
 
   function updateCounter() {
     if (!counter) return;
     counter.textContent = currentIndex >= 0 && allPhotos.length
-      ? `${currentIndex + 1} / ${allPhotos.length}`
+      ? `${pad(currentIndex + 1)} / ${pad(allPhotos.length)}`
       : '';
-  }
-
-  // Средний цвет снимка (по миниатюре из кэша браузера) подсвечивает фон лайтбокса.
-  const glowCache = new Map(); // url -> rgba-строка
-  function applyPhotoGlow(url) {
-    if (glowCache.has(url)) {
-      lightbox.style.setProperty('--photo-glow', glowCache.get(url));
-      return;
-    }
-    const probe = new Image();
-    probe.onload = () => {
-      let glow = 'rgba(120, 140, 160, 0.4)';
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 16;
-        canvas.height = 16;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(probe, 0, 0, 16, 16);
-        const data = ctx.getImageData(0, 0, 16, 16).data;
-        let r = 0, g = 0, b = 0;
-        const count = data.length / 4;
-        for (let i = 0; i < data.length; i += 4) {
-          r += data[i];
-          g += data[i + 1];
-          b += data[i + 2];
-        }
-        glow = `rgba(${Math.round(r / count)}, ${Math.round(g / count)}, ${Math.round(b / count)}, 0.5)`;
-      } catch (err) {
-        // canvas может быть "испачкан" кросс-доменным файлом - остаётся дефолт
-      }
-      glowCache.set(url, glow);
-      lightbox.style.setProperty('--photo-glow', glow);
-    };
-    probe.src = url;
   }
 
   function preloadNeighbors(index) {
     [index - 1, index + 1].forEach(i => {
       if (i >= 0 && i < allPhotos.length) {
-        new Image().src = allPhotos[i].full_url;
+        new Image().src = pickFullUrl(allPhotos[i]);
       }
     });
   }
@@ -327,48 +127,49 @@ function initLightbox(gallery, feed) {
     if (index < 0 || index >= allPhotos.length) return;
     currentIndex = index;
     const photo = allPhotos[index];
+    zoom.reset();
 
     // Направленный вход нового кадра: класс перевешивается с reflow,
     // чтобы анимация проигрывалась на каждом перелистывании.
     lightboxImg.classList.remove('slide-from-left', 'slide-from-right');
     if (direction) {
       void lightboxImg.offsetWidth;
-      lightboxImg.classList.add(
-        direction === 'next' ? 'slide-from-right' : 'slide-from-left'
-      );
+      lightboxImg.classList.add(direction === 'next' ? 'slide-from-right' : 'slide-from-left');
     }
 
-    // Blur-up: мгновенно показываем миниатюру из кэша,
-    // полную версию подменяем по её загрузке.
+    // Blur-up: сразу показываем миниатюру из кэша, полную версию подменяем по загрузке
+    const fullUrl = pickFullUrl(photo);
     lightboxImg.classList.add('is-loading');
     lightboxImg.src = photo.url;
-    lightboxImg.alt = photo.title || 'Увеличенное изображение';
+    lightboxImg.alt = photo.alt;
 
     const full = new Image();
     full.onload = () => {
       if (currentIndex !== index) return;
-      lightboxImg.src = photo.full_url;
+      lightboxImg.src = fullUrl;
       lightboxImg.classList.remove('is-loading');
     };
     full.onerror = () => {
       if (currentIndex === index) lightboxImg.classList.remove('is-loading');
     };
-    full.src = photo.full_url;
+    full.src = fullUrl;
 
     updateCounter();
-    applyPhotoGlow(photo.url);
     preloadNeighbors(index);
-    showSwipeHint();
   }
 
   // Переходы в духе DomeGallery (React Bits): фото вырастает из карточки,
   // одновременно проявляясь, а при закрытии сжимается в неё, растворяясь;
   // затем сама карточка мягко проявляется на месте. FLIP через WAAPI.
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const canZoom = () =>
-    typeof lightboxImg.animate === 'function' && !reduceMotion.matches;
-  const ENLARGE_MS = 300;
-  let closing = false;
+  const canAnimate = () => typeof lightboxImg.animate === 'function' && !reduceMotion.matches;
+
+  // Трансформация, которая кладёт кадр лайтбокса ровно на прямоугольник карточки
+  function frameToCard(frame, cardEl) {
+    const rect = cardEl.getBoundingClientRect();
+    const sx = rect.width / frame.width;
+    const sy = rect.height / frame.height;
+    return `translate(${rect.left - frame.left}px, ${rect.top - frame.top}px) scale(${sx}, ${sy})`;
+  }
 
   function finishClose() {
     if (!closing) return;
@@ -377,52 +178,23 @@ function initLightbox(gallery, feed) {
     lightboxImg.removeAttribute('src');
     lightboxImg.style.opacity = '';
     lightboxImg.style.transformOrigin = '';
-    // Снимаем fill:forwards прошлого полёта, чтобы следующий показ был чистым
-    if (typeof lightboxImg.getAnimations === 'function') {
-      lightboxImg.getAnimations().forEach(animation => animation.cancel());
-    }
+    lightboxImg.getAnimations().forEach(animation => animation.cancel());
     currentIndex = -1;
     updateCounter();
   }
 
-  // Трансформация, которая кладёт кадр лайтбокса ровно на прямоугольник rect
-  // (от левого верхнего угла, раздельный масштаб по осям, как в DomeGallery)
-  function frameToRect(frame, cardEl) {
-    const rect = cardEl.getBoundingClientRect();
-    const sx = rect.width / frame.width;
-    const sy = rect.height / frame.height;
-    // Радиус компенсируется масштабом, чтобы визуально совпасть с карточкой
-    const radius = parseFloat(getComputedStyle(cardEl).borderTopLeftRadius) || 0;
-    return {
-      transform: `translate(${rect.left - frame.left}px, ${rect.top - frame.top}px) scale(${sx}, ${sy})`,
-      radius: `${radius / sx}px / ${radius / sy}px`,
-    };
-  }
-
-  function fadeInCard(el) {
-    el.style.visibility = '';
-    if (typeof el.animate === 'function') {
-      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ENLARGE_MS, easing: 'ease-out' });
-    }
-  }
-
   function zoomFromCard(sourceEl) {
-    if (!canZoom() || !sourceEl) return;
+    if (!canAnimate() || !sourceEl) return;
 
     const fly = () => {
-      const from = sourceEl.getBoundingClientRect();
       const to = lightboxImg.getBoundingClientRect();
-      if (!from.width || !to.width) return;
-      const start = frameToRect(to, sourceEl);
-      const endRadius = getComputedStyle(lightboxImg).borderTopLeftRadius;
-
-      // Фото "поднимается" из сетки - карточка пустеет на время полёта
+      if (!to.width || !sourceEl.getBoundingClientRect().width) return;
       sourceEl.style.visibility = 'hidden';
       lightboxImg.style.transformOrigin = 'top left';
       const animation = lightboxImg.animate(
         [
-          { transform: start.transform, borderRadius: start.radius, opacity: 0 },
-          { transform: 'none', borderRadius: endRadius, opacity: 1 },
+          { transform: frameToCard(to, sourceEl), opacity: 0 },
+          { transform: 'none', opacity: 1 },
         ],
         { duration: ENLARGE_MS, easing: 'ease' }
       );
@@ -432,8 +204,8 @@ function initLightbox(gallery, feed) {
       });
     };
 
-    // Миниатюра почти всегда уже в кэше (она на экране) - размер известен
-    // синхронно; иначе прячем кадр до load, чтобы не мигнул в полный размер.
+    // Миниатюра почти всегда уже в кэше - размер известен синхронно;
+    // иначе прячем кадр до load, чтобы он не мигнул в полный размер.
     if (lightboxImg.complete && lightboxImg.naturalWidth) {
       fly();
     } else {
@@ -446,7 +218,7 @@ function initLightbox(gallery, feed) {
   }
 
   function openLightbox(index) {
-    if (closing) finishClose(); // предыдущее закрытие ещё летит - обрываем
+    if (closing) finishClose();
     lastFocused = document.activeElement;
     lightbox.classList.add('active');
     lightbox.setAttribute('aria-hidden', 'false');
@@ -459,11 +231,10 @@ function initLightbox(gallery, feed) {
   function closeLightbox() {
     if (closing || !lightbox.classList.contains('active')) return;
     closing = true;
+    zoom.reset();
 
-    const sourceEl =
-      currentIndex >= 0 && allPhotos[currentIndex] ? allPhotos[currentIndex].el : null;
+    const sourceEl = currentIndex >= 0 && allPhotos[currentIndex] ? allPhotos[currentIndex].el : null;
 
-    // Скрим и кнопки гаснут сразу; фото в это время летит в карточку
     lightbox.classList.remove('active');
     document.body.style.overflow = '';
     if (lastFocused && typeof lastFocused.focus === 'function') {
@@ -472,36 +243,34 @@ function initLightbox(gallery, feed) {
     lastFocused = null;
 
     const hasImage = Boolean(lightboxImg.getAttribute('src'));
-
-    if (canZoom() && hasImage && sourceEl && sourceEl.isConnected) {
+    if (canAnimate() && hasImage && sourceEl && sourceEl.isConnected) {
       const to = sourceEl.getBoundingClientRect();
       const from = lightboxImg.getBoundingClientRect();
-      const inViewport = to.width > 0 && to.bottom > 0 && to.top < window.innerHeight;
-      if (inViewport && from.width > 0) {
-        const end = frameToRect(from, sourceEl);
+      if (to.width > 0 && to.bottom > 0 && to.top < window.innerHeight && from.width > 0) {
         sourceEl.style.visibility = 'hidden';
         lightboxImg.style.transformOrigin = 'top left';
         const animation = lightboxImg.animate(
           [
             { transform: 'none', opacity: 1 },
-            { transform: end.transform, borderRadius: end.radius, opacity: 0 },
+            { transform: frameToCard(from, sourceEl), opacity: 0 },
           ],
           { duration: ENLARGE_MS, easing: 'ease-out', fill: 'forwards' }
         );
         settleAnimation(animation, ENLARGE_MS + 200, () => {
           finishClose();
-          fadeInCard(sourceEl);
+          sourceEl.style.visibility = '';
+          sourceEl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ENLARGE_MS, easing: 'ease-out' });
         });
         return;
       }
     }
 
-    if (canZoom() && hasImage) {
+    if (canAnimate() && hasImage) {
       // Карточка вне экрана - мягкое сжатие с растворением
       const animation = lightboxImg.animate(
         [
           { transform: 'none', opacity: 1 },
-          { transform: 'scale(0.9)', opacity: 0 },
+          { transform: 'scale(0.94)', opacity: 0 },
         ],
         { duration: ENLARGE_MS, easing: 'ease-out', fill: 'forwards' }
       );
@@ -512,26 +281,6 @@ function initLightbox(gallery, feed) {
     finishClose();
   }
 
-  function openFromImage(img) {
-    const fullUrl = img ? img.getAttribute('data-full') : '';
-    if (!fullUrl) return;
-
-    allPhotos = getVisiblePhotos();
-    const index = allPhotos.findIndex(photo => photo.full_url === fullUrl);
-    if (index === -1) return;
-    openLightbox(index);
-  }
-
-  gallery.addEventListener('click', function(e) {
-    const card = e.target.closest('.card');
-    if (!card || !gallery.contains(card)) return;
-
-    const img = card.querySelector('img');
-    if (img) {
-        openFromImage(img);
-    }
-  });
-
   function prevPhoto() {
     if (currentIndex > 0) showPhoto(currentIndex - 1, 'prev');
   }
@@ -541,32 +290,36 @@ function initLightbox(gallery, feed) {
       showPhoto(currentIndex + 1, 'next');
       return;
     }
-    // Достигнут конец загруженного - просим ленту догрузить страницу.
-    if (feed && feed.hasMore()) {
-      const appended = await feed.loadMore();
-      if (!lightbox.classList.contains('active')) return;
-      if (appended) {
-        allPhotos = getVisiblePhotos();
-        if (currentIndex < allPhotos.length - 1) {
-          showPhoto(currentIndex + 1, 'next');
-        } else {
-          updateCounter();
-        }
-      }
+    if (!feed.hasMore()) return;
+    const appended = await feed.loadMore();
+    if (!appended || !lightbox.classList.contains('active')) return;
+    allPhotos = getVisiblePhotos();
+    if (currentIndex < allPhotos.length - 1) {
+      showPhoto(currentIndex + 1, 'next');
+    } else {
+      updateCounter();
     }
   }
 
-  closeBtn && closeBtn.addEventListener('click', e => { e.stopPropagation(); closeLightbox(); });
-  prevBtn && prevBtn.addEventListener('click', e => { e.stopPropagation(); prevPhoto(); });
-  nextBtn && nextBtn.addEventListener('click', e => { e.stopPropagation(); nextPhoto(); });
-
-  // Закрытие по клику на фон
-  lightbox.addEventListener('click', (e) => {
-    if (e.target === lightbox) closeLightbox();
+  gallery.addEventListener('click', e => {
+    const card = e.target.closest('.card');
+    const img = card && card.querySelector('img');
+    if (!img) return;
+    allPhotos = getVisiblePhotos();
+    const index = allPhotos.findIndex(photo => photo.el === img);
+    if (index !== -1) openLightbox(index);
   });
 
-  // Управление клавиатурой
-  document.addEventListener('keydown', (e) => {
+  closeBtn.addEventListener('click', e => { e.stopPropagation(); closeLightbox(); });
+  prevBtn.addEventListener('click', e => { e.stopPropagation(); prevPhoto(); });
+  nextBtn.addEventListener('click', e => { e.stopPropagation(); nextPhoto(); });
+
+  // Клик по фону закрывает, если это не конец жеста
+  lightbox.addEventListener('click', e => {
+    if (e.target === lightbox && !zoom.justGestured()) closeLightbox();
+  });
+
+  document.addEventListener('keydown', e => {
     if (!lightbox.classList.contains('active')) return;
     if (e.key === 'ArrowLeft') prevPhoto();
     if (e.key === 'ArrowRight') nextPhoto();
@@ -574,10 +327,9 @@ function initLightbox(gallery, feed) {
   });
 
   // Focus trap: Tab не покидает модальный диалог
-  lightbox.addEventListener('keydown', (e) => {
+  lightbox.addEventListener('keydown', e => {
     if (e.key !== 'Tab') return;
-    const focusable = Array.from(lightbox.querySelectorAll('button'))
-      .filter(el => el.offsetParent !== null);
+    const focusable = Array.from(lightbox.querySelectorAll('button')).filter(el => el.offsetParent !== null);
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -589,13 +341,192 @@ function initLightbox(gallery, feed) {
       first.focus();
     }
   });
-
-  // Смена фото на тач-устройствах - интерактивным свайпом:
-  // кадр следует за пальцем, отпускание листает или возвращает на место.
-  setupSwipe(lightbox, lightboxImg, prevPhoto, nextPhoto, closeLightbox);
 }
 
-function setupInfiniteScroll(gallery, cardRevealer) {
+// Жесты лайтбокса на Pointer Events: щипок и двойной тап увеличивают фото,
+// увеличенное фото двигается пальцем или мышью; без увеличения горизонтальный
+// свайп листает, свайп вниз закрывает.
+function setupGestures(lightbox, img, actions) {
+  const MAX_SCALE = 4;
+  const DOUBLE_TAP_SCALE = 2.5;
+  const pointers = new Map();
+  let scale = 1;
+  let tx = 0;
+  let ty = 0;
+  let mode = null; // 'pinch' | 'pan' | 'swipe'
+  let start = null;
+  let axis = null;
+  let lastTap = null;
+  let gesturedAt = 0;
+
+  const center = () => ({
+    x: img.offsetLeft + img.offsetWidth / 2,
+    y: img.offsetTop + img.offsetHeight / 2,
+  });
+
+  function clampPan() {
+    const maxX = (img.offsetWidth * (scale - 1)) / 2;
+    const maxY = (img.offsetHeight * (scale - 1)) / 2;
+    tx = Math.max(-maxX, Math.min(maxX, tx));
+    ty = Math.max(-maxY, Math.min(maxY, ty));
+  }
+
+  function apply() {
+    const zoomed = scale > 1.001;
+    img.classList.toggle('is-zoomed', zoomed);
+    img.style.transform = zoomed ? `translate(${tx}px, ${ty}px) scale(${scale})` : '';
+  }
+
+  // Масштаб вокруг точки экрана: точка под пальцем остаётся на месте
+  function zoomAt(point, nextScale, fromScale = scale, from = { x: tx, y: ty }) {
+    const c = center();
+    const qx = (point.x - c.x - from.x) / fromScale;
+    const qy = (point.y - c.y - from.y) / fromScale;
+    scale = Math.max(1, Math.min(MAX_SCALE, nextScale));
+    tx = point.x - c.x - scale * qx;
+    ty = point.y - c.y - scale * qy;
+    clampPan();
+    apply();
+  }
+
+  function reset() {
+    scale = 1;
+    tx = 0;
+    ty = 0;
+    pointers.clear();
+    mode = null;
+    img.classList.remove('is-dragging');
+    img.style.opacity = '';
+    apply();
+  }
+
+  const points = () => Array.from(pointers.values());
+  const distance = ([a, b]) => Math.hypot(a.x - b.x, a.y - b.y);
+  const midpoint = ([a, b]) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+  function beginSinglePointer(p, pointerType) {
+    start = { x: p.x, y: p.y, tx, ty, moved: false };
+    axis = null;
+    if (scale > 1.001) mode = 'pan';
+    else mode = pointerType === 'mouse' ? null : 'swipe';
+  }
+
+  lightbox.addEventListener('pointerdown', e => {
+    if (e.target.closest('button') || !lightbox.classList.contains('active')) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try {
+      lightbox.setPointerCapture(e.pointerId);
+    } catch (err) {
+      // указатель уже отпущен - жест продолжится без захвата
+    }
+
+    if (pointers.size === 2) {
+      const pts = points();
+      start = { d: distance(pts), m: midpoint(pts), scale, tx, ty, moved: true };
+      mode = 'pinch';
+      img.classList.remove('is-dragging');
+      img.style.opacity = '';
+    } else if (pointers.size === 1) {
+      beginSinglePointer({ x: e.clientX, y: e.clientY }, e.pointerType);
+    }
+  });
+
+  lightbox.addEventListener('pointermove', e => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (mode === 'pinch' && pointers.size >= 2) {
+      const pts = points();
+      zoomAt(midpoint(pts), start.scale * (distance(pts) / start.d), start.scale, {
+        x: start.tx + (midpoint(pts).x - start.m.x),
+        y: start.ty + (midpoint(pts).y - start.m.y),
+      });
+      return;
+    }
+
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) start.moved = true;
+
+    if (mode === 'pan') {
+      tx = start.tx + dx;
+      ty = start.ty + dy;
+      clampPan();
+      apply();
+    } else if (mode === 'swipe') {
+      // Ось жеста фиксируется один раз - диагональ не листает и не закрывает одновременно
+      if (!axis) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      }
+      if (axis !== 'x') return;
+      img.classList.remove('slide-from-left', 'slide-from-right');
+      img.classList.add('is-dragging');
+      img.style.transform = `translateX(${dx}px)`;
+      img.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / window.innerWidth));
+    }
+  });
+
+  function endPointer(e, cancelled) {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.delete(e.pointerId);
+    const moved = start && start.moved;
+    if (moved) gesturedAt = performance.now();
+
+    if (mode === 'pinch') {
+      if (scale < 1.05) reset();
+      if (pointers.size === 1) beginSinglePointer(points()[0], e.pointerType);
+      else mode = null;
+      return;
+    }
+
+    if (mode === 'swipe' && !cancelled) {
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      img.classList.remove('is-dragging');
+      img.style.transform = '';
+      img.style.opacity = '';
+      if (axis === 'x' && Math.abs(dx) > 60) {
+        if (dx > 0) actions.prev();
+        else actions.next();
+      } else if (axis === 'y' && dy > 70) {
+        actions.close();
+      }
+    }
+    mode = null;
+
+    // Двойной тап по фото: увеличить в точке касания или вернуть исходный размер
+    if (!moved && !cancelled && e.target === img) {
+      const now = performance.now();
+      const tap = { x: e.clientX, y: e.clientY, t: now };
+      if (lastTap && now - lastTap.t < 300 && Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < 30) {
+        if (scale > 1.001) reset();
+        else zoomAt(tap, DOUBLE_TAP_SCALE);
+        lastTap = null;
+        gesturedAt = now;
+      } else {
+        lastTap = tap;
+      }
+    }
+  }
+
+  lightbox.addEventListener('pointerup', e => endPointer(e, false));
+  lightbox.addEventListener('pointercancel', e => {
+    endPointer(e, true);
+    img.classList.remove('is-dragging');
+    if (scale <= 1.001) {
+      img.style.transform = '';
+      img.style.opacity = '';
+    }
+  });
+
+  return {
+    reset,
+    justGestured: () => performance.now() - gesturedAt < 350,
+  };
+}
+
+function setupInfiniteScroll(gallery) {
   const sentinel = document.getElementById('gallery-sentinel');
   const status = document.getElementById('gallery-feed-status');
   if (!sentinel) {
@@ -607,17 +538,8 @@ function setupInfiniteScroll(gallery, cardRevealer) {
   let hasMore = sentinel.dataset.hasNext === 'true';
   let retryBlockedUntil = 0;
 
-  const maybeLoadMore = () => {
-    if (!hasMore || inflight) return;
-    const rect = sentinel.getBoundingClientRect();
-    if (rect.top <= window.innerHeight + 500) {
-      loadMore();
-    }
-  };
-
   const setFeedStatus = (state, message = '') => {
     if (!status) return;
-    status.dataset.state = state;
     status.textContent = message;
     // Ошибка даёт явную кнопку повтора вместо "прокрутите ещё раз"
     if (state === 'error') {
@@ -629,21 +551,9 @@ function setupInfiniteScroll(gallery, cardRevealer) {
         retryBlockedUntil = 0;
         loadMore();
       });
-      status.append(' ');
       status.appendChild(retry);
     }
-    status.hidden = state === 'idle' || message === '';
-  };
-
-  // После конца ленты слушатели не должны дёргаться на каждый скролл
-  let sentinelObserver = null;
-  const detachFeedListeners = () => {
-    if (sentinelObserver) {
-      sentinelObserver.disconnect();
-      sentinelObserver = null;
-    }
-    window.removeEventListener('scroll', maybeLoadMore);
-    window.removeEventListener('resize', maybeLoadMore);
+    status.hidden = !message;
   };
 
   // Возвращает промис с true, если новые карточки добавлены -
@@ -651,7 +561,6 @@ function setupInfiniteScroll(gallery, cardRevealer) {
   function loadMore() {
     if (inflight) return inflight;
     if (!hasMore || Date.now() < retryBlockedUntil) return Promise.resolve(false);
-
     inflight = fetchNextPage().finally(() => {
       inflight = null;
     });
@@ -659,106 +568,83 @@ function setupInfiniteScroll(gallery, cardRevealer) {
   }
 
   async function fetchNextPage() {
-    setFeedStatus('loading', 'Загружаем еще фото...');
+    setFeedStatus('loading', 'Загрузка...');
 
-    // Keyset-курсор от последней карточки; page - фолбэк,
-    // если карточек с id нет.
-    // data-ts передаётся вместе с id, чтобы курсор пережил удаление этого фото.
+    // Keyset-курсор от последней карточки; data-ts передаётся вместе с id,
+    // чтобы курсор пережил удаление этого фото. page - фолбэк без карточек.
     const cards = gallery.querySelectorAll('.card[data-id]');
     const lastCard = cards.length ? cards[cards.length - 1] : null;
-    let params = { page: nextPage };
-    if (lastCard) {
-      params = { after: lastCard.dataset.id };
-      if (lastCard.dataset.ts) params.after_ts = lastCard.dataset.ts;
-    }
+    const params = lastCard
+      ? { after: lastCard.dataset.id, after_ts: lastCard.dataset.ts || '' }
+      : { page: nextPage };
 
     try {
-      const response = await fetch(buildUrlWithQuery(window.location.href, params), {
-        headers: {
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
+      const response = await fetch(buildUrlWithQuery(window.location.pathname, params), {
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
 
-      const photos = Array.isArray(data.photos) ? data.photos : [];
-      let appended = 0;
-      if (photos.length) {
-        const fragment = document.createDocumentFragment();
-        const newCards = [];
-
-        photos.forEach(photo => {
-          const card = createGalleryCard(photo);
-          if (!card) return;
-          newCards.push(card);
-          fragment.appendChild(card);
-        });
-
-        if (newCards.length) {
-          gallery.appendChild(fragment);
-          newCards.forEach(card => cardRevealer.observe(card));
-          appended = newCards.length;
-
-          // Положение в ленте отражается в URL - "назад"/перезагрузка
-          // возвращают к текущей странице, а не в самый верх
-          const loadedPages = Math.ceil(gallery.querySelectorAll('.card').length / 12);
-          if (loadedPages > 1 && 'replaceState' in history) {
-            const url = new URL(window.location.href);
-            url.searchParams.set('page', String(loadedPages));
-            history.replaceState(history.state, '', url);
-          }
-        }
-      }
+      const newCards = (Array.isArray(data.photos) ? data.photos : [])
+        .map(createGalleryCard)
+        .filter(Boolean);
+      newCards.forEach(card => {
+        gallery.appendChild(card);
+        revealCard(card);
+      });
 
       hasMore = Boolean(data.has_next);
-      if (data.page !== undefined) {
-        const apiPage = parsePositiveInt(data.page, nextPage);
-        nextPage = apiPage + 1;
-        sentinel.dataset.currentPage = String(apiPage);
-      }
-      sentinel.dataset.hasNext = String(hasMore);
+      if (data.page !== undefined) nextPage = parsePositiveInt(data.page, nextPage) + 1;
       setFeedStatus('idle');
-
-      if (hasMore) {
-        requestAnimationFrame(maybeLoadMore);
-      } else {
-        detachFeedListeners();
-      }
-      return appended > 0;
+      if (!hasMore && observer) observer.disconnect();
+      return newCards.length > 0;
     } catch (err) {
       retryBlockedUntil = Date.now() + 2000;
-      setFeedStatus('error', 'Не удалось загрузить еще фото.');
-      console.error('Ошибка загрузки:', err);
+      setFeedStatus('error', 'Не удалось загрузить фото.');
+      console.error('Ошибка загрузки ленты:', err);
       return false;
     }
   }
 
-  if ('IntersectionObserver' in window) {
-    sentinelObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          loadMore();
-        }
-      });
-    }, { rootMargin: '0px 0px 500px 0px' });
-
-    sentinelObserver.observe(sentinel);
-  } else {
-    window.addEventListener('scroll', maybeLoadMore, { passive: true });
-  }
-
-  window.addEventListener('resize', maybeLoadMore, { passive: true });
-
-  if (hasMore) {
-    maybeLoadMore();
-  } else {
-    detachFeedListeners();
-  }
+  const observer = 'IntersectionObserver' in window && hasMore
+    ? new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) loadMore();
+      }, { rootMargin: '0px 0px 800px 0px' })
+    : null;
+  if (observer) observer.observe(sentinel);
 
   return { loadMore, hasMore: () => hasMore };
+}
+
+function createGalleryCard(photo) {
+  if (!photo || !photo.url || !photo.full_url) return null;
+  const label = photo.alt_text || 'Фотография';
+
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'card';
+  card.dataset.id = String(photo.id);
+  if (photo.uploaded_at) card.dataset.ts = String(photo.uploaded_at);
+  card.setAttribute('aria-label', `Открыть фото: ${label}`);
+
+  const img = document.createElement('img');
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  img.src = photo.url;
+  img.alt = label;
+  img.dataset.full = photo.full_url;
+  img.dataset.medium = photo.medium_url || '';
+
+  const width = parsePositiveInt(photo.width, 0);
+  const height = parsePositiveInt(photo.height, 0);
+  if (width && height) {
+    img.width = width;
+    img.height = height;
+    card.style.setProperty('--r', (width / height).toFixed(4));
+  }
+
+  card.appendChild(img);
+  return card;
 }
 
 function initUploadForm() {
@@ -774,7 +660,7 @@ function initUploadForm() {
   let uploading = false;
   const previewCache = new Map(); // file -> Promise<dataURL> (не перекодируем повторно)
   const previewNodes = new Map(); // file -> wrapper element
-  const fileLabelText = form.querySelector('.file-upload-text');
+  const fileLabelText = form.querySelector('.dropzone-text');
   const defaultLabelText = fileLabelText ? fileLabelText.textContent : '';
   submitBtn.disabled = true;
 
@@ -787,7 +673,7 @@ function initUploadForm() {
   form.addEventListener('submit', handleFormSubmit);
 
   // Drag and drop
-  const dropZone = fileInput.closest('.file-upload-wrapper');
+  const dropZone = fileInput.closest('.dropzone');
   if (dropZone) {
       ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
           dropZone.addEventListener(ev, preventDefaults);
@@ -914,7 +800,7 @@ function initUploadForm() {
       const totalMb =
           selectedFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
       fileLabelText.textContent =
-          `Выбрано: ${selectedFiles.length} файл(ов) · ${totalMb.toFixed(1)} МБ`;
+          `Выбрано: ${selectedFiles.length}, ${totalMb.toFixed(1)} МБ`;
   }
 
   // Превью кодируется один раз на файл; добавление/удаление других
@@ -1076,142 +962,6 @@ function initUploadForm() {
 function preventDefaults(e) {
   e.preventDefault();
   e.stopPropagation();
-}
-
-// Интерактивный свайп: тач-события приходят только с сенсорных экранов,
-// поэтому отдельная проверка "мобилка или нет" не нужна.
-function setupSwipe(lightbox, img, prev, next, close) {
-  let startX = null;
-  let startY = null;
-  let axis = null; // 'x' | 'y' - фиксируется по первому движению
-  let tracking = false;
-
-  const resetDrag = () => {
-      img.classList.remove('is-dragging');
-      img.style.transform = '';
-      img.style.opacity = '';
-  };
-
-  lightbox.addEventListener('touchstart', function(e) {
-      if (e.touches.length !== 1) {
-          tracking = false;
-          return;
-      }
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      axis = null;
-      tracking = true;
-  }, { passive: true });
-
-  lightbox.addEventListener('touchmove', function(e) {
-      if (!tracking) return;
-      const dX = e.touches[0].clientX - startX;
-      const dY = e.touches[0].clientY - startY;
-
-      // Ось жеста определяется один раз - диагональ не даёт
-      // одновременно и листать, и закрывать.
-      if (!axis) {
-          if (Math.abs(dX) < 8 && Math.abs(dY) < 8) return;
-          axis = Math.abs(dX) > Math.abs(dY) ? 'x' : 'y';
-      }
-      if (axis !== 'x') return;
-
-      // Кадр следует за пальцем и слегка тает к краям экрана.
-      // Классы входной анимации снимаем: работающая CSS-анимация
-      // перебивала бы inline-transform жеста.
-      img.classList.remove('slide-from-left', 'slide-from-right');
-      img.classList.add('is-dragging');
-      img.style.transform = `translateX(${dX}px)`;
-      img.style.opacity = String(
-          Math.max(0.35, 1 - Math.abs(dX) / window.innerWidth)
-      );
-  }, { passive: true });
-
-  lightbox.addEventListener('touchend', function(e) {
-      if (!tracking) return;
-      tracking = false;
-      const dX = e.changedTouches[0].clientX - startX;
-      const dY = e.changedTouches[0].clientY - startY;
-      resetDrag();
-
-      if (axis === 'x' && Math.abs(dX) > 60) {
-          // Палец увёл кадр влево - приходит следующий, и наоборот
-          if (dX > 0) prev();
-          else next();
-          return;
-      }
-
-      // Вертикальный жест вниз закрывает просмотр
-      if (axis === 'y' && dY > 70 && typeof close === 'function') {
-          close();
-      }
-  }, { passive: true });
-
-  lightbox.addEventListener('touchcancel', function() {
-      tracking = false;
-      resetDrag();
-  }, { passive: true });
-}
-
-function showSwipeHint() {
-  const hint = document.querySelector('.lightbox-hint');
-  if (!hint) return;
-
-  if (window.innerWidth > 600) {
-      hint.style.display = 'none';
-      return;
-  }
-
-  if (!sessionStorage.getItem('hintShown')) {
-      hint.style.display = 'block';
-      setTimeout(() => {
-          hint.style.opacity = '0';
-      }, 2000);
-      sessionStorage.setItem('hintShown', 'true');
-  }
-}
-
-function createGalleryCard(photo) {
-  if (!photo || !photo.url || !photo.full_url) return null;
-  const photoLabel = photo.alt_text || photo.title || 'Фотография';
-
-  const card = document.createElement('button');
-  card.type = 'button';
-  card.className = 'card';
-  if (photo.id !== undefined && photo.id !== null) {
-    card.dataset.id = String(photo.id);
-  }
-  if (photo.uploaded_at) {
-    card.dataset.ts = String(photo.uploaded_at);
-  }
-  card.setAttribute('aria-label', `Открыть фото: ${photoLabel}`);
-
-  const img = document.createElement('img');
-  img.loading = 'lazy';
-  img.decoding = 'async';
-  img.src = photo.url;
-  img.alt = photoLabel;
-  img.dataset.full = photo.full_url;
-
-  const width = parsePositiveInt(photo.width, 0);
-  const height = parsePositiveInt(photo.height, 0);
-  if (width > 0 && height > 0) {
-    img.width = width;
-    img.height = height;
-  }
-
-  card.appendChild(img);
-
-  // Чип-подпись - только у снимков с настоящим названием (как в шаблоне)
-  if (photo.title || photo.alt_text) {
-    const label = document.createElement('span');
-    label.className = 'card-label';
-    label.setAttribute('aria-hidden', 'true');
-    label.textContent = photoLabel;
-    card.appendChild(label);
-  }
-
-  return card;
 }
 
 // Идемпотентное завершение WAAPI-анимации: finished может не резолвиться

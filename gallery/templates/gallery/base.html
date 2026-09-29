@@ -48,81 +48,36 @@
     <meta property="og:image:alt" content="{{ seo_image_alt }}" />
     <meta name="twitter:image:alt" content="{{ seo_image_alt }}" />
     {% endif %}
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1a1a" />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7f7" />
+    <meta name="theme-color" content="#f1f0eb" />
     <script>
-      // До загрузки CSS: помечаем наличие JS (анимации карточек включаются
-      // только при нём) и применяем сохранённую тему без вспышки тёмной.
+      // Анимация появления карточек включается только при работающем JS
       document.documentElement.classList.add("js");
-      (function () {
-        try {
-          var stored = localStorage.getItem("darkMode");
-          var light =
-            stored === null
-              ? window.matchMedia("(prefers-color-scheme: light)").matches
-              : stored === "false";
-          if (light) document.documentElement.classList.add("light");
-        } catch (e) {}
-      })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Funnel+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..800&family=Geist+Mono:wght@400;500&display=swap"
     />
     <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
-    <noscript>
-      <style>
-        .card,
-        .card img {
-          opacity: 1 !important;
-          transform: none !important;
-          animation: none !important;
-        }
-      </style>
-    </noscript>
     <link rel="icon" href="{% static 'icon/favicon-light.ico' %}" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="{% static 'icon/favicon-dark.ico' %}" media="(prefers-color-scheme: light)" />
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'icon/apple-touch-icon.png' %}" />
     {% block extra_meta %}{% endblock %}
-    {% block head_scripts %}{% endblock %}
   </head>
   <body>
     <a class="skip-link" href="#main">К содержимому</a>
-    <header class="topbar">
-      <div class="container topbar-inner">
-        <a class="brand" href="/">{{ seo_site_name|default:"Timur Geruzov" }}</a>
-        <div class="topbar-actions">
-          {% if user.is_staff or user.is_superuser %}
-          <a class="icon-btn upload-toggle" aria-label="Загрузить фото" title="Загрузить фото" href="{% url 'upload_photo' %}">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </a>
-          {% endif %}
-          <button class="icon-btn theme-toggle" aria-label="Переключить тему" title="Переключить тему">
-            <svg class="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-            </svg>
-            <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          </button>
-        </div>
-      </div>
+    <header class="masthead">
+      <a class="wordmark" href="/">{{ seo_site_name|default:"Timur Geruzov" }}</a>
+      {% if user.is_staff %}
+      <a class="masthead-link" href="{% url 'upload_photo' %}">Загрузить</a>
+      {% endif %}
     </header>
     <main id="main">{% block content %}{% endblock %}</main>
-    <footer class="site-footer">
-      <p>© {% now "Y" %} {{ seo_site_name|default:"Timur Geruzov" }} - авторская фотогалерея</p>
-    </footer>
-    <button class="icon-btn scroll-top" type="button" aria-label="Наверх" title="Наверх">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 19V5m0 0-6 6m6-6 6 6" />
-      </svg>
+    <footer class="site-footer">&copy; {% now "Y" %} {{ seo_site_name|default:"Timur Geruzov" }}</footer>
+    <button class="to-top" type="button" aria-label="Наверх">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.5 12 5l6.5 6.5" /></svg>
     </button>
     <script src="{% static 'js/script.js' %}"></script>
-    {% block scripts %}{% endblock %}
   </body>
 </html>
