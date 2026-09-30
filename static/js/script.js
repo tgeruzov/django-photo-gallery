@@ -790,8 +790,10 @@ function initUploadForm() {
           const removeBtn = document.createElement('button');
           removeBtn.type = 'button';
           removeBtn.className = 'remove-preview';
-          removeBtn.setAttribute('aria-label', `Удалить ${file.name}`);
-          removeBtn.textContent = '×';
+          removeBtn.setAttribute('aria-label', `Убрать ${file.name}`);
+          removeBtn.title = 'Убрать';
+          removeBtn.innerHTML =
+              '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>';
           removeBtn.addEventListener('click', () => {
               if (uploading || wrapper.classList.contains('is-removing')) return;
               // Сначала карточка плавно схлопывается, потом перерисовка.
@@ -806,7 +808,16 @@ function initUploadForm() {
               }, 200);
           });
 
-          wrapper.append(img, removeBtn);
+          // Нижняя строка состояния: подпись и тонкая полоска прогресса
+          const status = document.createElement('span');
+          status.className = 'preview-status';
+          status.innerHTML =
+              '<svg class="preview-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>' +
+              '<span class="preview-label"></span>';
+          const bar = document.createElement('span');
+          bar.className = 'preview-progress';
+
+          wrapper.append(img, removeBtn, status, bar);
           preview.appendChild(wrapper);
           previewNodes.set(file, wrapper);
 
@@ -876,13 +887,51 @@ function initUploadForm() {
       });
   }
 
-  function setPreviewState(file, state) {
+  const STATE_LABELS = {
+      queued: '',
+      uploading: '0%',
+      processing: 'Обработка',
+      done: 'Готово',
+      duplicate: 'Уже есть',
+      error: 'Ошибка',
+  };
+  const STATES = Object.keys(STATE_LABELS).map(name => `is-${name}`);
+  const errorMessages = new Map(); // file -> текст ошибки для подсказки
+
+  function setPreviewState(file, state, progress) {
       const wrapper = previewNodes.get(file);
       if (!wrapper) return;
-      wrapper.classList.remove('is-uploading', 'is-done', 'is-duplicate', 'is-error');
-      if (state) {
-          wrapper.classList.add(`is-${state}`);
+      wrapper.classList.remove(...STATES);
+      if (state) wrapper.classList.add(`is-${state}`);
+      const label = wrapper.querySelector('.preview-label');
+      if (label) {
+          label.textContent = state === 'uploading' && progress !== undefined
+              ? `${Math.round(progress * 100)}%`
+              : STATE_LABELS[state] || '';
       }
+      wrapper.style.setProperty('--progress', String(progress ?? (state === 'uploading' ? 0 : 1)));
+      wrapper.title = state === 'error' ? errorMessages.get(file) || '' : '';
+  }
+
+  // Отправка одного файла через XHR: в отличие от fetch он сообщает прогресс отправки
+  function sendFile(file, csrfToken, onProgress) {
+      return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const formData = new FormData();
+          formData.append('files', file);
+          xhr.open('POST', form.action);
+          xhr.setRequestHeader('X-CSRFToken', csrfToken);
+          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+          xhr.upload.addEventListener('progress', e => {
+              if (e.lengthComputable) onProgress(e.loaded / e.total);
+          });
+          // Файл целиком ушёл на сервер - дальше он делает превью
+          xhr.upload.addEventListener('load', () => onProgress(1));
+          xhr.addEventListener('load', () => resolve(xhr));
+          xhr.addEventListener('error', reject);
+          xhr.addEventListener('abort', reject);
+          xhr.send(formData);
+      });
   }
 
   function setUploadStatus(message, kind) {
@@ -912,34 +961,30 @@ function initUploadForm() {
       let uploadedCount = 0;
       let duplicateCount = 0;
       let redirectUrl = '/';
+      errorMessages.clear();
+      selectedFiles.forEach(file => setPreviewState(file, 'queued'));
 
       for (let i = 0; i < total; i++) {
           const file = selectedFiles[i];
           submitBtn.textContent = `Загружаем ${i + 1} из ${total}...`;
-          setPreviewState(file, 'uploading');
+          setPreviewState(file, 'uploading', 0);
 
           try {
-              const formData = new FormData();
-              formData.append('files', file);
-              const response = await fetch(form.action, {
-                  method: 'POST',
-                  headers: {
-                      'X-CSRFToken': csrfToken,
-                      'X-Requested-With': 'XMLHttpRequest',
-                  },
-                  body: formData,
+              const xhr = await sendFile(file, csrfToken, progress => {
+                  if (progress < 1) setPreviewState(file, 'uploading', progress);
+                  else setPreviewState(file, 'processing');
               });
 
               // Истёкшая сессия отвечает HTML-редиректом на логин -
-              // отправляем пользователя туда вместо SyntaxError из json().
-              const contentType = response.headers.get('content-type') || '';
-              if (response.redirected || !contentType.includes('application/json')) {
-                  window.location.href = response.url || form.action;
+              // отправляем пользователя туда вместо ошибки разбора JSON.
+              const contentType = xhr.getResponseHeader('content-type') || '';
+              if (!contentType.includes('application/json')) {
+                  window.location.href = xhr.responseURL || form.action;
                   return;
               }
 
-              const result = await response.json();
-              if (response.ok && result.success) {
+              const result = JSON.parse(xhr.responseText);
+              if (xhr.status < 400 && result.success) {
                   redirectUrl = result.redirect_url || redirectUrl;
                   if (result.duplicates && result.duplicates.length) {
                       duplicateCount += 1;
@@ -953,11 +998,14 @@ function initUploadForm() {
                       (result.errors && result.errors[0]) || result.error || 'ошибка загрузки';
                   failedFiles.push(file);
                   failedMessages.push(detail);
+                  errorMessages.set(file, detail);
                   setPreviewState(file, 'error');
               }
           } catch (error) {
+              const detail = `${file.name}: сеть недоступна или сервер не ответил`;
               failedFiles.push(file);
-              failedMessages.push(`${file.name}: сеть недоступна или сервер не ответил`);
+              failedMessages.push(detail);
+              errorMessages.set(file, detail);
               setPreviewState(file, 'error');
           }
       }
@@ -966,8 +1014,10 @@ function initUploadForm() {
       preview.classList.remove('is-busy');
 
       if (!failedFiles.length) {
-          // Спиннер остаётся до ухода со страницы - редирект уже запущен
-          window.location.href = redirectUrl;
+          // Короткая пауза, чтобы состояние "Готово" успело показаться
+          setTimeout(() => {
+              window.location.href = redirectUrl;
+          }, 700);
           return;
       }
       submitBtn.classList.remove('is-loading');
