@@ -979,45 +979,94 @@ function initUploadForm() {
 
 // Эффекты по мотивам React Bits (reactbits.dev), переписанные без React и GSAP
 
-// Split Text: слова имени въезжают из-под маски по очереди.
-// Делим только на слова - деление на буквы ломало кернинг шрифта.
+// Split Text + Variable Proximity (React Bits): буквы имени по очереди
+// въезжают из-под маски, а рядом с курсором становятся жирнее.
+// Буквы - блоки только на время въезда, потом снова обычный текст:
+// так браузер снова применяет кернинг шрифта между ними.
 function initWordmark() {
   const wordmark = document.querySelector('.wordmark');
   const source = wordmark && wordmark.querySelector('.wordmark-text');
   if (!source) return;
 
+  const BASE = 700;
+  const PEAK = 900;
+  const RADIUS = 140;
+  const letters = [];
   const label = source.textContent.trim();
   wordmark.setAttribute('aria-label', label);
   source.textContent = '';
+
   label.split(' ').forEach((word, index) => {
     if (index) source.append(' ');
     const mask = document.createElement('span');
     mask.className = 'wordmark-word';
     mask.setAttribute('aria-hidden', 'true');
-    const inner = document.createElement('span');
-    // Кернинг Geist задвигает "i" под перекладину "T", и точка над "i" почти
-    // упирается в неё: раздвигаем только эту пару
-    word.split(/(?<=T)(?=i)/).forEach((part, partIndex, parts) => {
-      if (partIndex < parts.length - 1) {
-        const kern = document.createElement('span');
-        kern.className = 'wordmark-kern';
-        kern.textContent = part;
-        inner.appendChild(kern);
-      } else {
-        inner.append(part);
-      }
+    word.split('').forEach(char => {
+      const letter = document.createElement('span');
+      letter.className = 'wordmark-letter';
+      letter.textContent = char;
+      letter.style.setProperty('--i', String(letters.length));
+      mask.appendChild(letter);
+      letters.push(letter);
     });
-    inner.style.setProperty('--i', String(index));
-    mask.appendChild(inner);
     source.appendChild(mask);
   });
 
-  // Точка - внутри последнего слова: так она стоит на той же базовой линии,
-  // что и буквы, и въезжает вместе со словом
+  // Точка - внутри последнего слова, на той же базовой линии, что и буквы
   const dot = document.createElement('span');
   dot.className = 'wordmark-dot';
-  source.lastElementChild.firstElementChild.appendChild(dot);
-  wordmark.classList.add('is-split');
+  dot.style.setProperty('--i', String(letters.length));
+  source.lastElementChild.appendChild(dot);
+  wordmark.classList.add('is-split', 'intro');
+
+  const endIntro = () => wordmark.classList.remove('intro');
+  if (reduceMotion.matches) endIntro();
+  else {
+    dot.addEventListener('animationend', endIntro, { once: true });
+    setTimeout(endIntro, 2500); // если анимация не отыграла (фоновая вкладка)
+  }
+
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+  let pointer = null;
+  let scheduled = false;
+
+  const update = () => {
+    scheduled = false;
+    letters.forEach(letter => {
+      let weight = BASE;
+      if (pointer) {
+        const rect = letter.getBoundingClientRect();
+        const distance = Math.hypot(
+          pointer.x - (rect.left + rect.width / 2),
+          pointer.y - (rect.top + rect.height / 2)
+        );
+        if (distance < RADIUS) {
+          // Плавный спад к краю радиуса; за его пределами ровно базовая толщина
+          const t = 1 - distance / RADIUS;
+          weight = BASE + (PEAK - BASE) * t * t * (3 - 2 * t);
+        }
+      }
+      letter.style.fontVariationSettings = weight === BASE ? '' : `'wght' ${weight.toFixed(0)}`;
+    });
+  };
+
+  const schedule = () => {
+    if (!scheduled) {
+      scheduled = true;
+      requestAnimationFrame(update);
+    }
+  };
+
+  window.addEventListener('pointermove', e => {
+    pointer = { x: e.clientX, y: e.clientY };
+    schedule();
+  }, { passive: true });
+
+  document.documentElement.addEventListener('pointerleave', () => {
+    pointer = null;
+    schedule();
+  });
 }
 
 // Split Flap: механическое табло, каждый символ перелистывается
