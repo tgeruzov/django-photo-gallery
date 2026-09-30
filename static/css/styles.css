@@ -121,15 +121,16 @@ img {
 }
 
 .wordmark {
-  font-size: clamp(1.6rem, 1rem + 1.8vw, 2.75rem);
+  font-size: clamp(1.5rem, 0.95rem + 1.6vw, 2.5rem);
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
   text-decoration: none;
   font-kerning: normal;
 }
 
-/* Слова въезжают из-под маски снизу, по очереди */
+/* Маска слова: буквы въезжают из-под нижнего края по очереди */
 .wordmark-word {
   display: inline-block;
   overflow: hidden;
@@ -138,20 +139,18 @@ img {
   vertical-align: bottom;
 }
 
-.wordmark-word > span {
+.wordmark-letter {
+  transition: font-variation-settings 0.2s var(--ease);
+}
+
+.js .wordmark.intro .wordmark-letter,
+.js .wordmark.intro .wordmark-dot {
   display: inline-block;
+  animation: letter-in 0.8s var(--ease) both;
+  animation-delay: calc(var(--i) * 30ms + 80ms);
 }
 
-.wordmark-kern {
-  margin-right: 0.03em;
-}
-
-.js .wordmark-word > span {
-  animation: word-in 0.9s var(--ease) both;
-  animation-delay: calc(var(--i) * 90ms + 80ms);
-}
-
-@keyframes word-in {
+@keyframes letter-in {
   from { transform: translateY(105%); }
 }
 
