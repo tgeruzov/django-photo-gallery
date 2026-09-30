@@ -17,7 +17,8 @@
 
   --pad: clamp(12px, 2.4vw, 32px);
   --gap: 6px;
-  --rule: 1.5px solid var(--ink);
+  /* Тонкая тихая линия: делит страницу, но не спорит с фото */
+  --rule: 1px solid rgba(236, 235, 230, 0.1);
   /* Базовая высота строки сетки: фото в строке растягиваются до общей ширины */
   --row-h: 300px;
 
@@ -115,8 +116,9 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: calc(var(--pad) * 0.75) var(--pad);
-  margin-bottom: var(--gap);
+  /* Отступы снаружи, а не внутри: линия идёт ровно по ширине сетки */
+  margin: 0 var(--pad) calc(var(--pad) * 0.75);
+  padding: calc(var(--pad) * 0.75) 0;
   border-bottom: var(--rule);
 }
 
@@ -734,8 +736,8 @@ img {
 }
 
 .site-footer {
-  margin-top: 64px;
-  padding: var(--pad);
+  margin: 64px var(--pad) 0;
+  padding: var(--pad) 0;
   border-top: var(--rule);
   font: 400 12px/1 var(--mono);
   letter-spacing: 0.06em;
