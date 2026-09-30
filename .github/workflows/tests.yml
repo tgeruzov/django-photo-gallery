@@ -35,4 +35,4 @@ jobs:
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py test
-      - run: node --check static/js/script.js
+      - run: node --check static/js/script.js && node --check static/js/manage.js

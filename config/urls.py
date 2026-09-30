@@ -15,7 +15,13 @@ admin.site.login = throttled_login(admin.site.login)
 
 urlpatterns = [
     path("", views.index, name="index"),
-    path("upload/", views.upload_photo, name="upload_photo"),
+    path("manage/", views.manage, name="manage"),
+    path("manage/photos/", views.manage_photos, name="manage_photos"),
+    path("manage/photos/reorder/", views.manage_reorder, name="manage_reorder"),
+    path("manage/photos/delete/", views.manage_delete, name="manage_delete"),
+    path("manage/upload/", views.upload_photo, name="upload_photo"),
+    # Старый адрес загрузки из закладок
+    path("upload/", RedirectView.as_view(pattern_name="upload_photo", permanent=False)),
     path("all_photos.json", views.all_photos_json, name="all_photos_json"),
     path("healthz", views.healthz, name="healthz"),
     path("robots.txt", views.robots_txt, name="robots_txt"),

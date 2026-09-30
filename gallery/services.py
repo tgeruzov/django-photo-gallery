@@ -97,7 +97,7 @@ def save_uploaded_photo(uploaded_file) -> Photo:
     if Photo.objects.filter(content_hash=content_hash).exists():
         raise DuplicatePhotoError("такое фото уже загружено")
 
-    photo = Photo(content_hash=content_hash)
+    photo = Photo(content_hash=content_hash, position=Photo.top_position())
     try:
         with transaction.atomic():
             photo.image.save(os.path.basename(uploaded_file.name), uploaded_file, save=False)

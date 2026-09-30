@@ -1,3 +1,4 @@
+import json
 import logging
 
 from django import forms
@@ -7,16 +8,14 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.validators import FileExtensionValidator
-from django.db import connections
+from django.db import connections, transaction
 from django.db.models import Q
 from django.db.utils import DatabaseError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 from django.views.decorators.cache import cache_page
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
 from .models import Photo
 from .seo import (
@@ -104,7 +103,7 @@ def serialize_photo(photo):
 
     return {
         "id": photo.id,
-        "uploaded_at": photo.uploaded_at.isoformat(),
+        "position": photo.position,
         "url": preview_url,
         "full_url": full_url,
         "medium_url": photo.medium_url,
@@ -181,21 +180,28 @@ def build_index_context(request, photos_page):
     return context
 
 
-def build_upload_context(request, form):
+def build_manage_context(request, *, section, title):
+    """Общее для разделов управления: вкладки, счётчик фото, noindex."""
     context = {
-        "form": form,
-        "page_heading": "Загрузка фотографий",
-        "max_upload_size_mb": settings.MAX_UPLOAD_SIZE_MB,
+        "page_heading": title,
+        "manage_section": section,
+        "manage_photo_count": Photo.objects.count(),
     }
     context.update(
         build_seo_context(
             request,
-            title="Загрузка фотографий",
-            description="Служебная закрытая страница для управления публикацией фотографий.",
+            title=f"{title} - Управление",
+            description="Служебная закрытая страница для управления галереей.",
             robots=NOINDEX_ROBOTS,
-            canonical_path=reverse("upload_photo"),
+            canonical_path=request.path,
         )
     )
+    return context
+
+
+def build_upload_context(request, form):
+    context = build_manage_context(request, section="upload", title="Загрузка")
+    context.update({"form": form, "max_upload_size_mb": settings.MAX_UPLOAD_SIZE_MB})
     return context
 
 
@@ -206,10 +212,10 @@ def render_upload_page(request, form, *, status=200):
     return with_x_robots_tag(response, NOINDEX_ROBOTS)
 
 
-def resolve_feed_cursor(after, after_ts):
-    """Позиция курсора (uploaded_at, id) или None, если её не восстановить.
+def resolve_feed_cursor(after, after_pos):
+    """Позиция курсора (position, id) или None, если её не восстановить.
 
-    Время берётся из запроса: курсор не ломается, если фото, от которого
+    Позиция берётся из запроса: курсор не ломается, если фото, от которого
     листали, успели удалить. Поиск по pk - фолбэк для старых клиентов.
     """
     try:
@@ -217,35 +223,29 @@ def resolve_feed_cursor(after, after_ts):
     except (TypeError, ValueError):
         return None
 
-    cursor_ts = None
-    if after_ts:
-        try:
-            cursor_ts = parse_datetime(after_ts)
-        except ValueError:
-            cursor_ts = None
-    if cursor_ts is not None and timezone.is_naive(cursor_ts):
-        cursor_ts = None
-    if cursor_ts is not None:
-        return cursor_ts, cursor_id
+    try:
+        return int(after_pos), cursor_id
+    except (TypeError, ValueError):
+        pass
 
-    cursor = Photo.objects.filter(pk=cursor_id).values_list("uploaded_at", flat=True).first()
-    return (cursor, cursor_id) if cursor else None
+    cursor = Photo.objects.filter(pk=cursor_id).values_list("position", flat=True).first()
+    return (cursor, cursor_id) if cursor is not None else None
 
 
-def feed_after_response(request, photos_list, after, after_ts=None):
-    """Keyset-пагинация ленты по (uploaded_at, id) вместо OFFSET."""
-    position = resolve_feed_cursor(after, after_ts)
-    if position is None:
+def feed_after_response(request, photos_list, after, after_pos=None):
+    """Keyset-пагинация ленты по (position, id) вместо OFFSET."""
+    cursor = resolve_feed_cursor(after, after_pos)
+    if cursor is None:
         return with_x_robots_tag(
             JsonResponse({"photos": [], "has_next": False}),
             NOINDEX_ROBOTS,
         )
-    cursor_ts, cursor_id = position
+    cursor_pos, cursor_id = cursor
 
     window = list(
-        photos_list.filter(
-            Q(uploaded_at__lt=cursor_ts) | Q(uploaded_at=cursor_ts, id__lt=cursor_id)
-        )[: FEED_PAGE_SIZE + 1]
+        photos_list.filter(Q(position__gt=cursor_pos) | Q(position=cursor_pos, id__lt=cursor_id))[
+            : FEED_PAGE_SIZE + 1
+        ]
     )
     has_next = len(window) > FEED_PAGE_SIZE
     return with_x_robots_tag(
@@ -256,11 +256,11 @@ def feed_after_response(request, photos_list, after, after_ts=None):
 
 def index(request):
     # Явный tie-break по id - обязателен для корректного keyset-курсора
-    photos_list = Photo.objects.all().order_by("-uploaded_at", "-id")
+    photos_list = Photo.objects.all().order_by("position", "-id")
 
     if is_ajax(request) and request.GET.get("after") is not None:
         return feed_after_response(
-            request, photos_list, request.GET.get("after"), request.GET.get("after_ts")
+            request, photos_list, request.GET.get("after"), request.GET.get("after_pos")
         )
 
     paginator = Paginator(photos_list, FEED_PAGE_SIZE)
@@ -395,8 +395,8 @@ def upload_photo(request):
 @require_GET
 @cache_page(60)
 def all_photos_json(request):
-    # tie-break по id: без него фото с одинаковым временем прыгают между страницами
-    photos = Photo.objects.all().order_by("-uploaded_at", "-id")
+    # tie-break по id: без него фото с одинаковой позицией прыгают между страницами
+    photos = Photo.objects.all().order_by("position", "-id")
     max_page_size = MAX_JSON_PAGE_SIZE
 
     try:
@@ -440,6 +440,72 @@ def all_photos_json(request):
     )
 
 
+@staff_member_required
+def manage(request):
+    return redirect("manage_photos")
+
+
+@staff_member_required
+def manage_photos(request):
+    context = build_manage_context(request, section="photos", title="Фото")
+    context["photos"] = Photo.objects.order_by("position", "-id")
+    response = render(request, "gallery/manage_photos.html", context)
+    return with_x_robots_tag(response, NOINDEX_ROBOTS)
+
+
+def read_photo_ids(request):
+    """Список id из JSON-тела {"ids": [...]} или None, если он некорректен."""
+    try:
+        ids = json.loads(request.body).get("ids")
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(ids, list) or not all(
+        isinstance(pk, int) and not isinstance(pk, bool) for pk in ids
+    ):
+        return None
+    if len(set(ids)) != len(ids):
+        return None
+    return ids
+
+
+def bad_ids_response():
+    return JsonResponse({"success": False, "error": "Некорректный список фото"}, status=400)
+
+
+@staff_member_required
+@require_POST
+def manage_reorder(request):
+    """Сохраняет порядок: позиции 0..n-1 в порядке переданных id.
+
+    Фото, которых нет в списке (загружены в другой вкладке, пока открыт
+    раздел), сохраняют свои позиции: у новых они отрицательные, то есть выше всех.
+    """
+    ids = read_photo_ids(request)
+    if ids is None:
+        return bad_ids_response()
+    with transaction.atomic():
+        existing = set(Photo.objects.filter(id__in=ids).values_list("id", flat=True))
+        photos = [Photo(id=pk, position=index) for index, pk in enumerate(ids) if pk in existing]
+        Photo.objects.bulk_update(photos, ["position"])
+    return with_x_robots_tag(JsonResponse({"success": True, "saved": len(photos)}), NOINDEX_ROBOTS)
+
+
+@staff_member_required
+@require_POST
+def manage_delete(request):
+    """Удаляет фото вместе с файлами: их убирает django-cleanup после коммита."""
+    ids = read_photo_ids(request)
+    if ids is None or not ids:
+        return bad_ids_response()
+    _, per_model = Photo.objects.filter(id__in=ids).delete()
+    deleted = per_model.get(Photo._meta.label, 0)
+    logger.info("Удалено фото: %s", deleted)
+    return with_x_robots_tag(
+        JsonResponse({"success": True, "deleted": deleted, "total": Photo.objects.count()}),
+        NOINDEX_ROBOTS,
+    )
+
+
 @require_GET
 def healthz(request):
     """Проверка живости для контейнерных healthcheck-ов: приложение + БД."""
@@ -461,6 +527,7 @@ def robots_txt(request):
         "Allow: /",
         "Disallow: /admin/",
         "Disallow: /upload/",
+        "Disallow: /manage/",
         "Disallow: /all_photos.json",
         f"Sitemap: {request.build_absolute_uri(reverse('sitemap'))}",
     ]

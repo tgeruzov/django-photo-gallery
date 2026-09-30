@@ -1,0 +1,25 @@
+{% extends "gallery/base.html" %}
+
+{% block content %}
+  <div class="manage">
+    <header class="manage-head">
+      <h1 class="manage-title">Управление</h1>
+      <nav class="manage-tabs" aria-label="Разделы управления">
+        <a class="manage-tab" href="{% url 'manage_photos' %}"{% if manage_section == "photos" %} aria-current="page"{% endif %}>
+          Фото <span class="manage-tab-count" id="manage-photo-count">{{ manage_photo_count }}</span>
+        </a>
+        <a class="manage-tab" href="{% url 'upload_photo' %}"{% if manage_section == "upload" %} aria-current="page"{% endif %}>Загрузка</a>
+      </nav>
+      <div class="manage-links">
+        <a class="manage-link" href="{% url 'admin:index' %}" title="Заголовки, альтернативный текст, пользователи">Админка</a>
+        <form method="post" action="{% url 'admin:logout' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'index' %}" />
+          <button class="manage-link" type="submit">Выйти</button>
+        </form>
+      </div>
+    </header>
+
+    {% block manage_content %}{% endblock %}
+  </div>
+{% endblock %}

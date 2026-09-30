@@ -55,15 +55,25 @@ class Photo(models.Model):
     )
     title = models.CharField(max_length=200, blank=True, verbose_name="Заголовок/Описание")
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата загрузки")
+    # Место в ленте: чем меньше, тем выше. Новое фото встаёт первым,
+    # порядок меняется перетаскиванием в разделе управления.
+    position = models.IntegerField(default=0, verbose_name="Порядок")
 
     class Meta:
         verbose_name = "Фотография"
         verbose_name_plural = "Фотографии"
-        ordering = ["-uploaded_at", "-id"]
+        # При равной позиции (две загрузки одновременно) новое фото выше
+        ordering = ["position", "-id"]
         indexes = [
-            # Совпадает с сортировкой ленты и keyset-курсором (uploaded_at, id)
-            models.Index(fields=["-uploaded_at", "-id"], name="gallery_photo_up_id_idx"),
+            # Совпадает с сортировкой ленты и keyset-курсором (position, id)
+            models.Index(fields=["position", "-id"], name="gallery_photo_pos_id_idx"),
         ]
+
+    @classmethod
+    def top_position(cls):
+        """Позиция для нового фото: выше всех, что уже есть в ленте."""
+        lowest = cls.objects.aggregate(lowest=models.Min("position"))["lowest"]
+        return 0 if lowest is None else lowest - 1
 
     def __str__(self):
         if self.title:

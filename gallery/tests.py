@@ -1,10 +1,13 @@
+import importlib
 import json
+import os
 import re
 import shutil
 import tempfile
 from io import BytesIO
 from unittest import mock
 
+from django.apps import apps as django_apps
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -268,7 +271,7 @@ class GalleryPageTests(MediaTestCase):
 
         response = self.client.get(
             "/",
-            {"after": cursor.pk, "after_ts": cursor.uploaded_at.isoformat()},
+            {"after": cursor.pk, "after_pos": cursor.position},
             **AJAX,
         )
 
@@ -280,6 +283,126 @@ class GalleryPageTests(MediaTestCase):
         response = self.client.get("/", {"after": "zzz"}, **AJAX)
 
         self.assertEqual(response.json(), {"photos": [], "has_next": False})
+
+
+class ManageTests(MediaTestCase):
+    def setUp(self):
+        super().setUp()
+        self.make_admin()
+        # Загружены по порядку: 0 самое старое, в ленте оно последнее
+        self.photos = [
+            save_uploaded_photo(upload(f"{index}.jpg", image_bytes((index * 40, 0, 0))))
+            for index in range(4)
+        ]
+
+    def feed_ids(self):
+        return [item["id"] for item in self.client.get(reverse("all_photos_json")).json()["photos"]]
+
+    def post_ids(self, name, ids):
+        return self.client.post(
+            reverse(name), json.dumps({"ids": ids}), content_type="application/json"
+        )
+
+    def test_new_upload_goes_first(self):
+        self.assertEqual(self.feed_ids(), [p.pk for p in reversed(self.photos)])
+
+    def test_manage_pages_require_staff(self):
+        self.client.logout()
+        for name in ("manage", "manage_photos", "upload_photo"):
+            response = self.client.get(reverse(name))
+            self.assertEqual(response.status_code, 302)
+            self.assertIn("/admin/login/", response["Location"])
+        self.assertEqual(self.post_ids("manage_delete", [self.photos[0].pk]).status_code, 302)
+        self.assertEqual(Photo.objects.count(), 4)
+
+    def test_manage_photos_lists_photos_in_feed_order(self):
+        self.assertRedirects(self.client.get(reverse("manage")), reverse("manage_photos"))
+        response = self.client.get(reverse("manage_photos"))
+
+        ids = [
+            int(pk)
+            for pk in re.findall(r'class="manage-tile" data-id="(\d+)"', response.content.decode())
+        ]
+        self.assertEqual(ids, [p.pk for p in reversed(self.photos)])
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow, noarchive")
+
+    def test_old_upload_address_redirects(self):
+        response = self.client.get("/upload/")
+
+        self.assertRedirects(response, reverse("upload_photo"))
+
+    def test_reorder_changes_feed_and_keyset_cursor(self):
+        order = [p.pk for p in self.photos]  # самое старое первым
+        response = self.post_ids("manage_reorder", order)
+
+        self.assertEqual(response.json(), {"success": True, "saved": 4})
+        self.assertEqual(self.feed_ids(), order)
+        second = Photo.objects.get(pk=order[1])
+        feed = self.client.get(
+            "/", {"after": second.pk, "after_pos": second.position}, **AJAX
+        ).json()
+        self.assertEqual([item["id"] for item in feed["photos"]], order[2:])
+
+    def test_photo_uploaded_after_reorder_goes_first(self):
+        self.post_ids("manage_reorder", [p.pk for p in self.photos])
+        newest = save_uploaded_photo(upload("new.jpg", image_bytes((0, 0, 250))))
+
+        self.assertEqual(self.feed_ids()[0], newest.pk)
+
+    def test_reorder_ignores_deleted_ids(self):
+        order = [p.pk for p in self.photos] + [999999]
+
+        self.assertEqual(self.post_ids("manage_reorder", order).json()["saved"], 4)
+
+    def test_reorder_rejects_bad_payload(self):
+        url = reverse("manage_reorder")
+        bad_bodies = [
+            "not json",
+            json.dumps([1, 2]),
+            json.dumps({"ids": ["1"]}),
+            json.dumps({"ids": [True]}),
+            json.dumps({"ids": [self.photos[0].pk, self.photos[0].pk]}),
+        ]
+        for body in bad_bodies:
+            response = self.client.post(url, body, content_type="application/json")
+            self.assertEqual(response.status_code, 400, body)
+        self.assertEqual(self.client.get(url).status_code, 405)
+
+    def test_delete_removes_photos_and_files(self):
+        victim, survivor = self.photos[0], self.photos[1]
+        victim.refresh_from_db()
+        paths = [victim.image.path, victim.thumbnail.path, victim.optimized_image.path]
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.post_ids("manage_delete", [victim.pk])
+
+        self.assertEqual(response.json(), {"success": True, "deleted": 1, "total": 3})
+        self.assertFalse(Photo.objects.filter(pk=victim.pk).exists())
+        self.assertTrue(Photo.objects.filter(pk=survivor.pk).exists())
+        for path in paths:
+            self.assertFalse(os.path.exists(path), path)
+
+    def test_delete_rejects_empty_list(self):
+        self.assertEqual(self.post_ids("manage_delete", []).status_code, 400)
+        self.assertEqual(Photo.objects.count(), 4)
+
+    def test_admin_added_photo_goes_first(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("admin:gallery_photo_add"),
+                {"title": "", "alt_text": "", "image": upload("a.jpg", image_bytes((1, 250, 1)))},
+            )
+
+        self.assertEqual(self.feed_ids()[0], Photo.objects.latest("id").pk)
+
+    def test_migration_numbers_existing_photos_newest_first(self):
+        migration = importlib.import_module("gallery.migrations.0004_photo_position")
+        Photo.objects.update(position=0)
+
+        migration.number_by_upload_date(django_apps, None)
+
+        positions = dict(Photo.objects.values_list("id", "position"))
+        self.assertEqual([positions[p.pk] for p in reversed(self.photos)], [0, 1, 2, 3])
 
 
 class ServiceEndpointTests(TestCase):
@@ -296,7 +419,7 @@ class ServiceEndpointTests(TestCase):
         self.assertEqual(response.status_code, 503)
 
     def test_robots_and_sitemap(self):
-        self.assertContains(self.client.get("/robots.txt"), "Disallow: /upload/")
+        self.assertContains(self.client.get("/robots.txt"), "Disallow: /manage/")
         self.assertEqual(self.client.get("/sitemap.xml").status_code, 200)
 
     def test_error_pages_render(self):

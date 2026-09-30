@@ -1,9 +1,7 @@
-{% extends "gallery/base.html" %}
+{% extends "gallery/manage_base.html" %}
 
-{% block content %}
-  <section class="upload">
-    <h1 class="page-title">Загрузка</h1>
-
+{% block manage_content %}
+  <section class="upload" aria-label="Загрузка фото">
     <form method="post" enctype="multipart/form-data" id="upload-form" data-max-upload-mb="{{ max_upload_size_mb }}">
       {% csrf_token %}
       <label class="dropzone" for="id_files">

@@ -636,12 +636,12 @@ function setupInfiniteScroll(gallery) {
   async function fetchNextPage() {
     setFeedStatus('loading', 'Загрузка...');
 
-    // Keyset-курсор от последней карточки; data-ts передаётся вместе с id,
+    // Keyset-курсор от последней карточки; data-pos передаётся вместе с id,
     // чтобы курсор пережил удаление этого фото. page - фолбэк без карточек.
     const cards = gallery.querySelectorAll('.card[data-id]');
     const lastCard = cards.length ? cards[cards.length - 1] : null;
     const params = lastCard
-      ? { after: lastCard.dataset.id, after_ts: lastCard.dataset.ts || '' }
+      ? { after: lastCard.dataset.id, after_pos: lastCard.dataset.pos || '' }
       : { page: nextPage };
 
     try {
@@ -690,7 +690,7 @@ function createGalleryCard(photo) {
   card.type = 'button';
   card.className = 'card';
   card.dataset.id = String(photo.id);
-  if (photo.uploaded_at) card.dataset.ts = String(photo.uploaded_at);
+  if (photo.position !== undefined) card.dataset.pos = String(photo.position);
   card.setAttribute('aria-label', `Открыть фото: ${label}`);
 
   const img = document.createElement('img');

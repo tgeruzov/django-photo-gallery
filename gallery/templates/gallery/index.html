@@ -22,7 +22,7 @@
       type="button"
       style="--r: {{ photo.display_ratio|stringformat:'s' }}"
       data-id="{{ photo.id }}"
-      data-ts="{{ photo.uploaded_at.isoformat }}"
+      data-pos="{{ photo.position }}"
       aria-label="Открыть фото: {{ photo.display_label }}"
     >
       <img

@@ -1,0 +1,76 @@
+{% extends "gallery/manage_base.html" %}
+{% load static %}
+
+{% block manage_content %}
+  <section
+    class="manage-photos"
+    id="manage-photos"
+    aria-label="Порядок и удаление фото"
+    data-reorder-url="{% url 'manage_reorder' %}"
+    data-delete-url="{% url 'manage_delete' %}"
+    data-csrf="{{ csrf_token }}"
+  >
+    {% if photos %}
+    <div class="manage-toolbar">
+      <p class="manage-hint" id="manage-hint">
+        <span class="manage-hint-pointer">Перетащите фото, чтобы поменять порядок, нажмите, чтобы выбрать.</span>
+        <span class="manage-hint-touch">Удерживайте фото и перетащите, чтобы поменять порядок, коснитесь, чтобы выбрать.</span>
+      </p>
+      <div class="manage-actions" id="manage-actions" hidden>
+        <span class="manage-selected" id="manage-selected"></span>
+        <button class="manage-action" type="button" data-action="top">В начало</button>
+        <button class="manage-action" type="button" data-action="bottom">В конец</button>
+        <button class="manage-action" type="button" data-action="clear">Снять выбор</button>
+        <button class="manage-action manage-action--danger" type="button" data-action="delete">Удалить</button>
+      </div>
+      <p class="manage-save" id="manage-save" role="status"></p>
+    </div>
+
+    <ol class="manage-grid" id="manage-grid" aria-describedby="manage-hint manage-keys">
+      {% for photo in photos %}
+      <li class="manage-tile" data-id="{{ photo.id }}" data-label="{{ photo.display_label }}">
+        <button
+          class="manage-tile-button"
+          type="button"
+          aria-pressed="false"
+          aria-label="{{ photo.display_label }}, место {{ forloop.counter }}"
+        >
+          {% with preview=photo.display_file %}{% if preview %}
+          <img src="{{ preview.url }}" alt="" loading="lazy" decoding="async" draggable="false" />
+          {% endif %}{% endwith %}
+          <span class="manage-tile-number" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</span>
+          <span class="manage-tile-check" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+          </span>
+        </button>
+      </li>
+      {% endfor %}
+    </ol>
+    <p class="visually-hidden" id="manage-keys">
+      Стрелки переводят фокус между фото, Alt со стрелками двигает фото,
+      пробел выбирает, Delete удаляет выбранные, Escape снимает выбор.
+    </p>
+    <p class="visually-hidden" id="manage-announce" aria-live="assertive"></p>
+
+    <dialog class="manage-dialog" id="manage-delete-dialog" aria-labelledby="manage-dialog-title">
+      <form method="dialog">
+        <p class="manage-dialog-title" id="manage-dialog-title">Удалить фото?</p>
+        <p class="manage-dialog-text">Снимки и все их версии удалятся с диска. Вернуть их не получится.</p>
+        <div class="manage-dialog-actions">
+          <button class="button button--quiet" value="cancel" autofocus>Отмена</button>
+          <button class="button button--danger" value="confirm">Удалить</button>
+        </div>
+      </form>
+    </dialog>
+    {% else %}
+    <div class="empty-state">
+      <p class="empty-state-title">Пока пусто</p>
+      <a class="button" href="{% url 'upload_photo' %}">Загрузить фото</a>
+    </div>
+    {% endif %}
+  </section>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{% static 'js/manage.js' %}"></script>
+{% endblock %}

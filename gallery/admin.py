@@ -57,7 +57,7 @@ class PhotoAdmin(admin.ModelAdmin):
     )
     date_hierarchy = "uploaded_at"
     search_fields = ("title", "alt_text", "image", "optimized_image", "thumbnail")
-    ordering = ("-uploaded_at", "-id")
+    ordering = ("position", "-id")
     # Версии строит только сервис: загруженная руками миниатюра
     # разошлась бы с оригиналом и с размерами в базе
     readonly_fields = ("optimized_image", "medium_image", "thumbnail", "uploaded_at", "preview")
@@ -113,6 +113,9 @@ class PhotoAdmin(admin.ModelAdmin):
         )
 
     def save_model(self, request, obj, form, change):
+        if not change:
+            # Как и при обычной загрузке, новое фото встаёт первым в ленте
+            obj.position = Photo.top_position()
         image_changed = "image" in form.changed_data and bool(obj.image)
         if image_changed:
             obj.content_hash = getattr(form, "content_hash", None)

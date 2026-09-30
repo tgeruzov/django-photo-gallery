@@ -276,10 +276,14 @@ img {
   object-fit: cover;
 }
 
+.card img {
+  transition: filter 0.6s var(--ease), transform 1.2s var(--ease);
+}
+
 .js .card img {
   opacity: 0;
   transform: scale(1.08);
-  transition: opacity 0.7s var(--ease), transform 1.2s var(--ease);
+  transition: opacity 0.7s var(--ease), transform 1.2s var(--ease), filter 0.6s var(--ease);
 }
 
 .js .card.loaded.inview img {
@@ -287,23 +291,12 @@ img {
   transform: none;
 }
 
-/* Наведение: акцентная линия вырастает вдоль нижнего края */
-.card::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.35s var(--ease);
-}
-
+/* Наведение: фото чуть светлеет и едва заметно приближается, без рамок и линий */
 @media (hover: hover) {
-  .card:hover::after {
-    transform: scaleX(1);
+  .card:hover img,
+  .js .card.loaded.inview:hover img {
+    transform: scale(1.02);
+    filter: brightness(1.06);
   }
 }
 
@@ -975,6 +968,418 @@ img {
   margin: 24px 0 0;
 }
 
+/* Управление: вкладки разделов сверху, внутри - загрузка или порядок фото */
+
+.masthead-link.is-current {
+  color: var(--ink);
+}
+
+.manage {
+  padding: 0 var(--pad);
+}
+
+.manage .upload {
+  max-width: none;
+  padding: 0;
+}
+
+.manage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px 40px;
+  margin: calc(var(--pad) * 0.5) 0 calc(var(--pad) * 0.75);
+}
+
+.manage-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 1rem + 2vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.015em;
+}
+
+.manage-tabs {
+  display: flex;
+  gap: 28px;
+  flex: 1;
+}
+
+.manage-tab {
+  padding: 4px 0 6px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.manage-tab:hover {
+  color: var(--ink);
+}
+
+.manage-tab[aria-current="page"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.manage-tab-count {
+  margin-left: 4px;
+  font: 400 12px/1 var(--mono);
+  color: var(--muted);
+}
+
+.manage-links {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+}
+
+.manage-links form {
+  margin: 0;
+}
+
+.manage-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 400 12px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+
+.manage-link:hover {
+  color: var(--ink);
+}
+
+/* Панель над сеткой: подсказка или действия с выбранными, справа - сохранение */
+.manage-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  min-height: 56px;
+  margin-bottom: var(--gap);
+  padding: 8px 0;
+  background: var(--paper);
+}
+
+.manage-hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.manage-hint-touch {
+  display: none;
+}
+
+@media (hover: none) {
+  .manage-hint-pointer {
+    display: none;
+  }
+
+  .manage-hint-touch {
+    display: inline;
+  }
+}
+
+.manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.manage-actions[hidden],
+.manage-hint[hidden] {
+  display: none;
+}
+
+.manage-selected {
+  margin-right: 8px;
+  font: 400 12px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.manage-action {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(236, 235, 230, 0.22);
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.manage-action:hover {
+  border-color: var(--ink);
+}
+
+.manage-action--danger {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.manage-action--danger:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+}
+
+.manage-save {
+  margin: 0 0 0 auto;
+  font: 400 12px/1.4 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.manage-save.is-error {
+  color: var(--accent);
+}
+
+.manage-retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* Сетка управления: одинаковые квадраты, чтобы перетаскивать было предсказуемо */
+.manage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@media (max-width: 640px) {
+  .manage-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+}
+
+.manage-tile {
+  position: relative;
+  aspect-ratio: 1;
+  background: var(--paper-2);
+}
+
+.manage-tile-button {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: none;
+  cursor: grab;
+  touch-action: manipulation;
+}
+
+.manage-tile-button:focus-visible {
+  outline-offset: -2px;
+}
+
+.manage-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease), filter 0.4s var(--ease);
+}
+
+/* Номер места внизу, как номер кадра на плёнке */
+.manage-tile-button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
+  pointer-events: none;
+}
+
+.manage-tile-number {
+  position: absolute;
+  left: 8px;
+  bottom: 7px;
+  z-index: 1;
+  font: 400 10px/1 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+/* Квадрат выбора в углу: пустой при наведении, оранжевый с галочкой у выбранных */
+.manage-tile-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid rgba(236, 235, 230, 0.85);
+  opacity: 0;
+  transition: opacity 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.manage-tile-check svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 2.25;
+  opacity: 0;
+}
+
+@media (hover: hover) {
+  .manage-tile-button:hover img {
+    filter: brightness(1.06);
+  }
+
+  .manage-tile-button:hover .manage-tile-check {
+    opacity: 0.7;
+  }
+}
+
+/* Рамка поверх фото: у кнопки она оказалась бы под картинкой */
+.manage-tile.is-selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+}
+
+.manage-tile.is-selected img {
+  opacity: 0.72;
+}
+
+.manage-tile.is-selected .manage-tile-check {
+  opacity: 1;
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.manage-tile.is-selected .manage-tile-check svg {
+  opacity: 1;
+}
+
+/* Место, куда встанет перетаскиваемое фото */
+.manage-tile.is-placeholder {
+  background: none;
+  outline: 1px dashed rgba(236, 235, 230, 0.35);
+  outline-offset: -1px;
+}
+
+.manage-tile.is-placeholder .manage-tile-button {
+  visibility: hidden;
+}
+
+/* Копия фото под пальцем или курсором */
+.manage-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1500;
+  margin: 0;
+  list-style: none;
+  pointer-events: none;
+  outline: 1px solid rgba(236, 235, 230, 0.5);
+  will-change: transform;
+}
+
+.is-sorting,
+.is-sorting * {
+  cursor: grabbing !important;
+}
+
+.manage-photos.is-busy .manage-grid {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Подтверждение удаления */
+.manage-dialog {
+  width: min(420px, calc(100vw - 2 * var(--pad)));
+  padding: 28px;
+  border: 0;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.manage-dialog::backdrop {
+  background: rgba(14, 14, 13, 0.78);
+}
+
+.manage-dialog form {
+  margin: 0;
+}
+
+.manage-dialog-title {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.manage-dialog-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+.manage-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.button--quiet {
+  background: none;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(236, 235, 230, 0.25);
+}
+
+.button--quiet:hover:not(:disabled) {
+  background: var(--tile);
+}
+
+.button--danger {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.button--danger:hover:not(:disabled) {
+  background: #ff7a40;
+}
+
 /* Страницы ошибок и футер */
 
 /* Страницы ошибок: полоса плёнки. 404 - пропавший кадр среди настоящих
@@ -1119,7 +1524,9 @@ img {
     animation-delay: 0s;
   }
 
-  .js .card img {
+  .js .card img,
+  .card:hover img,
+  .js .card.loaded.inview:hover img {
     transform: none;
   }
 
