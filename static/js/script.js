@@ -1000,6 +1000,13 @@ function initWordmark() {
     mask.appendChild(inner);
     source.appendChild(mask);
   });
+
+  // Точка - внутри последнего слова: так она стоит на той же базовой линии,
+  // что и буквы, и въезжает вместе со словом
+  const dot = document.createElement('span');
+  dot.className = 'wordmark-dot';
+  source.lastElementChild.firstElementChild.appendChild(dot);
+  wordmark.classList.add('is-split');
 }
 
 // Split Flap: механическое табло, каждый символ перелистывается

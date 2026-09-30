@@ -151,13 +151,21 @@ img {
   from { transform: translateY(105%); }
 }
 
-.wordmark::after {
+.wordmark::after,
+.wordmark-dot {
   content: "";
   display: inline-block;
   width: 0.16em;
   height: 0.16em;
-  margin-left: 0.06em;
+  /* "v" внизу сходится в острие: без отрицательного отступа зазор до точки
+     оптически шире межбуквенного */
+  margin-left: -0.01em;
   background: var(--accent);
+}
+
+/* Без JS точку рисует ::after, с JS - отдельный элемент внутри последнего слова */
+.wordmark.is-split::after {
+  content: none;
 }
 
 .masthead-link {
