@@ -70,12 +70,14 @@
     <header class="masthead">
       <a class="wordmark" href="/"><span class="wordmark-text">{{ seo_site_name|default:"Timur Geruzov" }}</span></a>
       {% if user.is_staff %}
-      <a class="masthead-link" href="{% url 'upload_photo' %}">Загрузить</a>
+      <a class="icon-button masthead-link" href="{% url 'upload_photo' %}" aria-label="Загрузить фото" title="Загрузить фото">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 14v5h14v-5" /></svg>
+      </a>
       {% endif %}
     </header>
     <main id="main">{% block content %}{% endblock %}</main>
     <footer class="site-footer">&copy; {% now "Y" %} {{ seo_site_name|default:"Timur Geruzov" }}</footer>
-    <button class="to-top" type="button" aria-label="Наверх">
+    <button class="icon-button to-top" type="button" aria-label="Наверх" title="Наверх">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M5.5 11.5 12 5l6.5 6.5" /></svg>
     </button>
     <script src="{% static 'js/script.js' %}"></script>
