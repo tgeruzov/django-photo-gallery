@@ -1,9 +1,12 @@
+# Python caches, local virtual environments and editor settings
 __pycache__/
 *.pyc
 .venv/
 venv/
-media/
-staticfiles/
 .env
 .idea/
 .vscode/
+
+# Uploaded photos and collectstatic output: created by the running app, not published
+media/
+staticfiles/
