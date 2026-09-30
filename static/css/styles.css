@@ -171,17 +171,37 @@ img {
   content: none;
 }
 
-.masthead-link {
-  font: 500 12px/1 var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-decoration: none;
-  padding-bottom: 3px;
-  border-bottom: 1.5px solid transparent;
+/* Иконки-кнопки: тонкий штрих, приглушённый цвет, светлеют при наведении */
+.icon-button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s var(--ease), opacity 0.3s var(--ease);
 }
 
-.masthead-link:hover {
-  border-color: var(--accent);
+.icon-button:hover,
+.icon-button:focus-visible {
+  color: var(--ink);
+}
+
+.icon-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: square;
+}
+
+.masthead-link {
+  margin-right: -9px; /* штрих иконки на одной линии с краем сетки */
 }
 
 /* Сетка: строки одной высоты. Ширина фото пропорциональна --r (ширина к высоте),
@@ -375,21 +395,8 @@ img {
 }
 
 .lightbox-close {
-  padding: 6px 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-  color: inherit;
-  cursor: pointer;
+  margin: -9px -9px -9px 0;
   pointer-events: auto;
-  transition: color 0.2s var(--ease);
-}
-
-.lightbox-close:hover,
-.lightbox-close:focus-visible {
-  color: var(--ink);
 }
 
 /* Невидимая зона вдоль края экрана: не заходит на фото, чтобы не мешать жестам */
@@ -437,14 +444,6 @@ img {
 
 .lightbox-next:hover svg {
   transform: translateX(3px);
-}
-
-.to-top svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.75;
 }
 
 .lightbox-bar,
@@ -509,31 +508,18 @@ img {
 
 .to-top {
   position: fixed;
-  right: var(--pad);
-  bottom: var(--pad);
+  right: calc(var(--pad) - 9px);
+  bottom: calc(var(--pad) - 9px);
   z-index: 900;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: var(--ink);
-  color: var(--paper);
-  cursor: pointer;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s var(--ease), visibility 0s linear 0.2s, background 0.2s var(--ease);
+  transition: opacity 0.3s var(--ease), visibility 0s linear 0.3s, color 0.2s var(--ease);
 }
 
 .to-top.visible {
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.2s var(--ease), background 0.2s var(--ease);
-}
-
-.to-top:hover {
-  background: var(--accent);
+  transition: opacity 0.3s var(--ease), color 0.2s var(--ease);
 }
 
 .alert {
