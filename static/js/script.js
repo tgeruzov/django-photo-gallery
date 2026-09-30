@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', function () {
   initAlerts();
   initToTop();
   initWordmark();
-  initFlaps();
   fillFilmStrip();
   initGallery();
   initUploadForm();
@@ -1135,124 +1134,6 @@ function initWordmark() {
   });
 }
 
-// Split Flap: механическое табло, каждый символ перелистывается
-// через несколько случайных цифр к нужному.
-function createSplitFlap(el, { flipMs = 70, stagger = 35, flips = 5 } = {}) {
-  const DIGITS = '0123456789';
-  let tiles = [];
-  let current = '';
-  let raf = null;
-
-  const isFlapChar = ch => /[0-9A-Za-zА-Яа-я]/.test(ch);
-
-  function build(text) {
-    el.textContent = '';
-    el.classList.add('flap');
-    tiles = text.split('').map(ch => {
-      if (!isFlapChar(ch)) {
-        const sep = document.createElement('span');
-        sep.className = 'flap-sep';
-        sep.textContent = ch === ' ' ? ' ' : ch;
-        el.appendChild(sep);
-        return null;
-      }
-      const tile = document.createElement('span');
-      tile.className = 'flap-tile';
-      tile.innerHTML =
-        '<span class="flap-half flap-top"><span class="flap-char"></span></span>' +
-        '<span class="flap-half flap-bottom"><span class="flap-char"></span></span>';
-      el.appendChild(tile);
-      setTile(tile, ch, ch);
-      return tile;
-    });
-  }
-
-  function setTile(tile, top, bottom) {
-    tile.querySelector('.flap-top .flap-char').textContent = top;
-    tile.querySelector('.flap-bottom .flap-char').textContent = bottom;
-  }
-
-  // Один перелёт: верхняя створка со старым символом падает, нижняя с новым встаёт
-  function flipTile(tile, from, to) {
-    tile.querySelectorAll('.flap-leaf').forEach(leaf => leaf.remove());
-    setTile(tile, to, from);
-    const front = document.createElement('span');
-    front.className = 'flap-half flap-leaf flap-leaf--front';
-    front.innerHTML = `<span class="flap-char">${from}</span>`;
-    const back = document.createElement('span');
-    back.className = 'flap-half flap-leaf flap-leaf--back';
-    back.innerHTML = `<span class="flap-char">${to}</span>`;
-    tile.append(front, back);
-    // animationend может не прийти в фоновой вкладке - страхуемся таймером
-    let settled = false;
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      if (front.isConnected) setTile(tile, to, to);
-      front.remove();
-      back.remove();
-    };
-    back.addEventListener('animationend', settle, { once: true });
-    setTimeout(settle, flipMs + 40);
-  }
-
-  function set(text, { animate = true } = {}) {
-    if (raf) cancelAnimationFrame(raf);
-    const sameShape = text.length === current.length &&
-      text.split('').every((ch, i) => isFlapChar(ch) === isFlapChar(current[i]));
-    if (!sameShape) {
-      build(animate ? text.replace(/[0-9]/g, '0') : text);
-      if (!animate) {
-        current = text;
-        el.setAttribute('aria-label', text);
-        return;
-      }
-      current = text.replace(/[0-9]/g, '0');
-    }
-    el.setAttribute('aria-label', text);
-    el.style.setProperty('--flip-ms', `${flipMs}ms`);
-
-    if (!animate || reduceMotion.matches) {
-      text.split('').forEach((ch, i) => tiles[i] && setTile(tiles[i], ch, ch));
-      current = text;
-      return;
-    }
-
-    const plans = text.split('').map((to, i) => {
-      const from = current[i];
-      if (!tiles[i] || from === to) return null;
-      const steps = Array.from({ length: flips }, () => DIGITS[Math.floor(Math.random() * 10)]);
-      steps.push(to);
-      return { tile: tiles[i], from, steps, start: i * stagger, step: -1 };
-    }).filter(Boolean);
-    current = text;
-    if (!plans.length) return;
-
-    const began = performance.now();
-    const tick = now => {
-      let pending = false;
-      plans.forEach(plan => {
-        const step = Math.floor((now - began - plan.start) / flipMs);
-        if (step < 0) {
-          pending = true;
-          return;
-        }
-        if (step < plan.steps.length) pending = true;
-        const index = Math.min(step, plan.steps.length - 1);
-        if (index !== plan.step) {
-          const from = plan.step < 0 ? plan.from : plan.steps[plan.step];
-          plan.step = index;
-          flipTile(plan.tile, from, plan.steps[index]);
-        }
-      });
-      raf = pending ? requestAnimationFrame(tick) : null;
-    };
-    raf = requestAnimationFrame(tick);
-  }
-
-  return { set };
-}
-
 // 404: кадры вокруг пропавшего заполняются случайными снимками галереи.
 // Если запрос не удался, кадры просто остаются тёмными.
 async function fillFilmStrip() {
@@ -1270,14 +1151,6 @@ async function fillFilmStrip() {
   } catch (err) {
     // сеть недоступна - пустые кадры тоже смотрятся как плёнка
   }
-}
-
-function initFlaps() {
-  document.querySelectorAll('[data-split-flap]').forEach(el => {
-    const flap = createSplitFlap(el, { flipMs: 90, stagger: 120, flips: 7 });
-    const text = el.textContent.trim();
-    flap.set(text);
-  });
 }
 
 // Появление фото по мотивам Animated Content: снимок проявляется и оседает

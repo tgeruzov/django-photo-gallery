@@ -4,7 +4,7 @@
 
 **Персональная фотогалерея на Django**
 
-![Version](https://img.shields.io/badge/version-0.5.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.5.1-blue?style=flat-square)
 [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue?style=flat-square)](./LICENSE)
 
 </div>
@@ -128,13 +128,13 @@ docker compose up --build
 * **У фото нет превью:** например, если процесс оборвался посреди обработки. В `/admin/` отметьте такие фото и выберите действие `Generate missing derivatives`: галерея достроит недостающие версии.
 * **Не видно иконки загрузки:** она показывается только администратору. Войдите через `/admin/`.
 
-Страницы ошибок оформлены как плёнка: на 404 кадры вокруг пропавшего заполняются случайными снимками галереи, на 500 плёнка засвечена. Своё оформление они показывают только при `DEBUG=0`, в режиме разработки Django выводит техническую страницу.
+Страницы ошибок оформлены как плёнка: на 404 кадры вокруг пропавшего заполняются случайными снимками галереи, на 500 плёнка засвечена. На сервере они показываются при `DEBUG=0`, а в режиме разработки их можно открыть по адресам [localhost:8000/404/](http://localhost:8000/404/) и [localhost:8000/500/](http://localhost:8000/500/).
 
 ---
 
 ## Технические детали
 
-Python 3.13, Django 6.1, PostgreSQL 16 через psycopg 3, Pillow, Gunicorn и WhiteNoise. Фронтенд на чистом JS и CSS без сборки: шрифты Geist и Geist Mono, одна тёмная тема. Переход при открытии фото, анимация имени в шапке и табло на страницах ошибок написаны по мотивам компонентов [React Bits](https://reactbits.dev) без React.
+Python 3.13, Django 6.1, PostgreSQL 16 через psycopg 3, Pillow, Gunicorn и WhiteNoise. Фронтенд на чистом JS и CSS без сборки: шрифты Geist и Geist Mono, одна тёмная тема. Переход при открытии фото и анимация имени в шапке написаны по мотивам компонентов [React Bits](https://reactbits.dev) без React.
 
 | Путь | Назначение |
 |---|---|

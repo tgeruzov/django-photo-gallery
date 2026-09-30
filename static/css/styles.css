@@ -941,7 +941,9 @@ img {
 }
 
 .film-code {
-  font: 500 clamp(1rem, 0.7rem + 1.2vw, 1.6rem)/1 var(--mono);
+  font: 400 clamp(1.1rem, 0.7rem + 1.4vw, 1.8rem)/1 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 
 /* 500: кадры выгорели, в центральном - оранжевый блик */
@@ -957,7 +959,7 @@ img {
 }
 
 .error-page--exposed .film-code {
-  color: var(--paper);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .js .error-page--exposed .film-frame {
@@ -1001,99 +1003,6 @@ img {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
-}
-
-/* Split Flap: табло из плиток, каждая перелистывается двумя створками */
-
-.flap {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-variant-numeric: tabular-nums;
-}
-
-.flap-tile {
-  position: relative;
-  display: inline-block;
-  width: 1.15em;
-  height: 1.5em;
-  perspective: 6em;
-  color: var(--ink);
-}
-
-.flap-half {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 50%;
-  overflow: hidden;
-  background: var(--tile);
-}
-
-.flap-top,
-.flap-leaf--front {
-  top: 0;
-}
-
-.flap-bottom,
-.flap-leaf--back {
-  bottom: 0;
-}
-
-.flap-char {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1.5em;
-  line-height: 1.5em;
-  text-align: center;
-}
-
-.flap-bottom .flap-char,
-.flap-leaf--back .flap-char {
-  top: -0.75em;
-}
-
-/* Линия сгиба посередине плитки */
-.flap-tile::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  margin-top: -0.5px;
-  background: var(--paper);
-  opacity: 0.7;
-  z-index: 3;
-}
-
-.flap-leaf {
-  z-index: 2;
-  backface-visibility: hidden;
-}
-
-.flap-leaf--front {
-  transform-origin: bottom;
-  animation: flap-front calc(var(--flip-ms, 70ms) / 2) ease-in forwards;
-}
-
-.flap-leaf--back {
-  transform-origin: top;
-  transform: rotateX(90deg);
-  animation: flap-back calc(var(--flip-ms, 70ms) / 2) ease-out calc(var(--flip-ms, 70ms) / 2) forwards;
-}
-
-@keyframes flap-front {
-  to { transform: rotateX(-90deg); }
-}
-
-@keyframes flap-back {
-  to { transform: rotateX(0deg); }
-}
-
-.flap-sep {
-  padding: 0 0.12em;
 }
 
 @media (prefers-reduced-motion: reduce) {
