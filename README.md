@@ -4,7 +4,7 @@
 
 **Персональная фотогалерея на Django**
 
-![Version](https://img.shields.io/badge/version-0.3.10-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.4.0-blue?style=flat-square)
 [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue?style=flat-square)](./LICENSE)
 
 </div>
@@ -132,7 +132,7 @@ docker compose up --build
 
 ## Технические детали
 
-Django 5.2, PostgreSQL 16, Pillow, Gunicorn и WhiteNoise. Фронтенд на чистом JS и CSS без сборки: шрифты Geist и Geist Mono, одна тёмная тема. Переход при открытии фото, анимация имени в шапке и табло на страницах ошибок написаны по мотивам компонентов [React Bits](https://reactbits.dev) без React.
+Python 3.13, Django 6.1, PostgreSQL 16 через psycopg 3, Pillow, Gunicorn и WhiteNoise. Фронтенд на чистом JS и CSS без сборки: шрифты Geist и Geist Mono, одна тёмная тема. Переход при открытии фото, анимация имени в шапке и табло на страницах ошибок написаны по мотивам компонентов [React Bits](https://reactbits.dev) без React.
 
 | Путь | Назначение |
 |---|---|
