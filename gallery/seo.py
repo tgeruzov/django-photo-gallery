@@ -75,13 +75,14 @@ def build_seo_context(
     }
 
 
-def build_gallery_structured_data(request, photos, *, title, description):
+def build_gallery_structured_data(request, photos, *, title, description, canonical_path=None):
+    page_url = build_absolute_url(request, canonical_path)
     graph = [
         {
             "@type": "WebSite",
-            "@id": f"{build_absolute_url(request)}#website",
+            "@id": f"{page_url}#website",
             "name": SITE_NAME,
-            "url": build_absolute_url(request),
+            "url": page_url,
             "inLanguage": "ru",
             "description": description,
         }
@@ -125,9 +126,9 @@ def build_gallery_structured_data(request, photos, *, title, description):
         graph.append(
             {
                 "@type": "ImageGallery",
-                "@id": f"{build_absolute_url(request)}#gallery",
+                "@id": f"{page_url}#gallery",
                 "name": title,
-                "url": build_absolute_url(request),
+                "url": page_url,
                 "description": description,
                 "image": image_objects,
             }

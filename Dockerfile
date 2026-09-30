@@ -11,6 +11,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN DEBUG=0 SECRET_KEY=collectstatic python manage.py collectstatic --noinput
 
+# Приложение работает не от root: писать ему нужно только в media/
+RUN useradd --uid 1000 --no-create-home --shell /usr/sbin/nologin app \
+    && mkdir -p /app/media \
+    && chown app:app /app/media
+USER app
+
 EXPOSE 8000
 
 # Продакшен-запуск; docker-compose.yml для разработки заменяет его на runserver

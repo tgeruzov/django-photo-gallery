@@ -53,12 +53,7 @@
       // Анимация появления карточек включается только при работающем JS
       document.documentElement.classList.add("js");
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..900&family=Geist+Mono:wght@400;500&display=swap"
-    />
+    <link rel="preload" href="{% static 'fonts/geist-latin-wght-normal.woff2' %}" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
     <link rel="icon" href="{% static 'icon/favicon-light.ico' %}" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="{% static 'icon/favicon-dark.ico' %}" media="(prefers-color-scheme: light)" />

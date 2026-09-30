@@ -1,13 +1,51 @@
+import logging
+
+from django import forms
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.html import format_html
 
 from .models import Photo
-from .services import ensure_photo_derivatives_by_id
+from .services import clear_variants, compute_upload_hash, ensure_photo_derivatives_by_id
+from .validators import validate_file_size, validate_image_type
+
+logger = logging.getLogger(__name__)
+
+
+class PhotoAdminForm(forms.ModelForm):
+    """Новый оригинал в админке проходит те же проверки, что и на странице загрузки."""
+
+    class Meta:
+        model = Photo
+        fields = ("title", "alt_text", "image")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # С DELETE_ORIGINAL_AFTER_OPTIMIZE у фото нет оригинала,
+        # а заголовок и alt всё равно должны редактироваться
+        if self.instance.pk:
+            self.fields["image"].required = False
+
+    def clean_image(self):
+        image = self.cleaned_data.get("image")
+        if "image" not in self.changed_data or not image:
+            return image
+        validate_file_size(image)
+        validate_image_type(image)
+        content_hash = compute_upload_hash(image)
+        duplicates = Photo.objects.filter(content_hash=content_hash)
+        if self.instance.pk:
+            duplicates = duplicates.exclude(pk=self.instance.pk)
+        if duplicates.exists():
+            raise ValidationError("Такое фото уже есть в галерее.")
+        self.content_hash = content_hash
+        return image
 
 
 @admin.register(Photo)
 class PhotoAdmin(admin.ModelAdmin):
+    form = PhotoAdminForm
     list_display = (
         "id",
         "title_or_filename",
@@ -20,7 +58,9 @@ class PhotoAdmin(admin.ModelAdmin):
     date_hierarchy = "uploaded_at"
     search_fields = ("title", "alt_text", "image", "optimized_image", "thumbnail")
     ordering = ("-uploaded_at", "-id")
-    readonly_fields = ("uploaded_at", "preview")
+    # Версии строит только сервис: загруженная руками миниатюра
+    # разошлась бы с оригиналом и с размерами в базе
+    readonly_fields = ("optimized_image", "medium_image", "thumbnail", "uploaded_at", "preview")
     actions = ("generate_missing_derivatives",)
 
     fieldsets = (
@@ -73,9 +113,27 @@ class PhotoAdmin(admin.ModelAdmin):
         )
 
     def save_model(self, request, obj, form, change):
+        image_changed = "image" in form.changed_data and bool(obj.image)
+        if image_changed:
+            obj.content_hash = getattr(form, "content_hash", None)
+            # Старые версии показывали бы прежний снимок
+            clear_variants(obj)
         super().save_model(request, obj, form, change)
-        # Фото, добавленное через админку, тоже получает превью
-        transaction.on_commit(lambda: ensure_photo_derivatives_by_id(obj.pk))
+        # Фото, добавленное или заменённое через админку, тоже получает превью
+        transaction.on_commit(lambda: self.build_derivatives(request, obj.pk))
+
+    def build_derivatives(self, request, photo_id):
+        # Запись уже сохранена: сбой обработки - предупреждение, а не страница 500
+        try:
+            ensure_photo_derivatives_by_id(photo_id)
+        except Exception:
+            logger.exception("Не удалось построить версии фото %s", photo_id)
+            self.message_user(
+                request,
+                "Фото сохранено, но версии не построились. "
+                "Выберите действие Generate missing derivatives, чтобы повторить.",
+                level=messages.WARNING,
+            )
 
     @admin.action(description="Generate missing derivatives")
     def generate_missing_derivatives(self, request, queryset):
@@ -87,6 +145,7 @@ class PhotoAdmin(admin.ModelAdmin):
                 else:
                     skipped += 1
             except Exception:
+                logger.exception("Не удалось построить версии фото %s", photo_id)
                 failed += 1
         self.message_user(
             request,

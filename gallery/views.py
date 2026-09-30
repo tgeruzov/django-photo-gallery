@@ -9,7 +9,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.validators import FileExtensionValidator
 from django.db import connections
 from django.db.models import Q
-from django.db.utils import OperationalError
+from django.db.utils import DatabaseError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -31,6 +31,7 @@ from .services import (
     ImageProcessingError,
     save_uploaded_photo,
 )
+from .validators import validate_file_size, validate_image_type
 
 logger = logging.getLogger(__name__)
 NOINDEX_ROBOTS = "noindex, nofollow, noarchive"
@@ -61,33 +62,6 @@ class MultipleFileField(forms.FileField):
             result = [single_file_clean(d, initial) for d in data]
             return result
         return [single_file_clean(data, initial)]
-
-
-def validate_file_size(uploaded_file):
-    """Проверяет размер файла по MAX_UPLOAD_SIZE_MB."""
-    limit_mb = settings.MAX_UPLOAD_SIZE_MB
-    limit_bytes = limit_mb * 1024 * 1024
-    if uploaded_file.size > limit_bytes:
-        raise ValidationError(
-            f"Файл слишком большой ({uploaded_file.size // 1024 // 1024}MB). Максимум: {limit_mb}MB"
-        )
-
-
-def validate_image_type(uploaded_file):
-    """Проверяет тип изображения по сигнатурам файлов"""
-    uploaded_file.seek(0)
-    header = uploaded_file.read(12)  # Читаем первые байты
-    uploaded_file.seek(0)
-
-    # Сигнатуры форматов
-    if header.startswith(b"\xff\xd8\xff"):
-        return  # JPEG
-    elif header.startswith(b"\x89PNG\r\n\x1a\n"):
-        return  # PNG
-    elif header.startswith(b"RIFF") and header[8:12] == b"WEBP":
-        return  # WEBP
-
-    raise ValidationError("Недопустимый формат файла. Разрешены только JPEG, PNG, WEBP.")
 
 
 class PhotoUploadForm(forms.Form):
@@ -173,6 +147,12 @@ def build_index_context(request, photos_page):
             get_primary_photo_file(featured_photo)
         )
 
+    # Canonical собирается из номера страницы, а не из запроса: ?page=abc,
+    # ?page=1 и метки вроде utm_source не плодят копии главной.
+    canonical_path = reverse("index")
+    if photos_page.number > 1:
+        canonical_path += f"?page={photos_page.number}"
+
     context = {
         "photos_page": photos_page,
         # Hero-баннер на главной убран - заголовок остаётся скрытым <h1>
@@ -183,6 +163,7 @@ def build_index_context(request, photos_page):
             photos,
             title=gallery_title,
             description=gallery_description,
+            canonical_path=canonical_path,
         ),
     }
     context.update(
@@ -190,6 +171,7 @@ def build_index_context(request, photos_page):
             request,
             title=gallery_title,
             description=gallery_description,
+            canonical_path=canonical_path,
             image_url=featured_image_url,
             image_alt=featured_image_alt,
             image_width=featured_width,
@@ -323,11 +305,13 @@ def upload_photo(request):
                 field: [str(error) for error in errs] for field, errs in form.errors.items()
             }
             if is_ajax(request):
+                # errors - плоский список причин: его показывает страница загрузки
                 return with_x_robots_tag(
                     JsonResponse(
                         {
                             "success": False,
                             "error": "Ошибки валидации",
+                            "errors": [msg for msgs in validation_errors.values() for msg in msgs],
                             "details": validation_errors,
                         },
                         status=400,
@@ -459,9 +443,12 @@ def all_photos_json(request):
 @require_GET
 def healthz(request):
     """Проверка живости для контейнерных healthcheck-ов: приложение + БД."""
+    # Настоящий запрос: на переиспользованном соединении (CONN_MAX_AGE)
+    # одно открытие курсора до базы не доходит и не заметит её падения.
     try:
-        connections["default"].cursor()
-    except OperationalError:
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except DatabaseError:
         return with_x_robots_tag(JsonResponse({"status": "error"}, status=503), NOINDEX_ROBOTS)
     return with_x_robots_tag(JsonResponse({"status": "ok"}), NOINDEX_ROBOTS)
 

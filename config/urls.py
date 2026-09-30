@@ -8,6 +8,10 @@ from django.views.generic import RedirectView
 
 from gallery import views
 from gallery.seo import RootSitemap
+from gallery.throttle import throttled_login
+
+# Подбор пароля к админке упирается в лимит попыток
+admin.site.login = throttled_login(admin.site.login)
 
 urlpatterns = [
     path("", views.index, name="index"),

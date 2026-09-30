@@ -9,7 +9,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-// Сообщения закрываются крестиком и сами исчезают через 6 секунд
+// Сообщения закрываются крестиком. Успех и справка сами исчезают через 6 секунд,
+// ошибки и предупреждения остаются, пока их не закроют: их важно успеть прочитать
 function initAlerts() {
   document.querySelectorAll('.alert').forEach(alert => {
     if (alert.id === 'upload-status') return; // управляется формой загрузки
@@ -27,7 +28,10 @@ function initAlerts() {
     close.addEventListener('click', dismiss);
     alert.appendChild(close);
 
-    setTimeout(dismiss, 6000);
+    const persistent = ['alert-error', 'alert-danger', 'alert-warning'].some(name =>
+      alert.classList.contains(name)
+    );
+    if (!persistent) setTimeout(dismiss, 6000);
   });
 }
 
@@ -612,10 +616,21 @@ function setupInfiniteScroll(gallery) {
   function loadMore() {
     if (inflight) return inflight;
     if (!hasMore || Date.now() < retryBlockedUntil) return Promise.resolve(false);
-    inflight = fetchNextPage().finally(() => {
+    inflight = fetchNextPage().then(appended => {
       inflight = null;
+      if (appended) recheckSentinel();
+      return appended;
     });
     return inflight;
+  }
+
+  // Observer срабатывает только на входе в зону и выходе из неё. Если после
+  // подгрузки sentinel всё ещё в зоне (высокий экран), события больше не будет
+  // и лента встанет. Повторное observe сразу сообщает текущее состояние.
+  function recheckSentinel() {
+    if (!observer || !hasMore) return;
+    observer.unobserve(sentinel);
+    observer.observe(sentinel);
   }
 
   async function fetchNextPage() {
@@ -792,12 +807,22 @@ function initUploadForm() {
       fileInput.files = dt.files;
   }
 
+  // Плитки создаются сразу, а картинки для них готовятся асинхронно. Пока они
+  // готовятся, файлы могут добавить или убрать: номер прохода отменяет
+  // устаревший, чтобы он не трогал уже перерисованный список.
+  let renderPass = 0;
+
   async function renderPreviews() {
+      const pass = ++renderPass;
+      const files = selectedFiles.slice();
       preview.innerHTML = '';
       previewNodes.clear();
+      updateFileLabel();
+      submitBtn.disabled = files.length === 0 || uploading;
+      const tiles = [];
 
-      for (let i = 0; i < selectedFiles.length; i++) {
-          const file = selectedFiles[i];
+      for (let i = 0; i < files.length; i++) {
+          const file = files[i];
           const wrapper = document.createElement('div');
           wrapper.className = 'preview-wrapper';
 
@@ -838,8 +863,13 @@ function initUploadForm() {
           wrapper.append(img, removeBtn, status, bar);
           preview.appendChild(wrapper);
           previewNodes.set(file, wrapper);
+          tiles.push({ file, wrapper, img });
+      }
 
+      // Плитки уже на месте, картинки проявляются по очереди
+      for (const { file, wrapper, img } of tiles) {
           const dataUrl = await getPreview(file);
+          if (pass !== renderPass) return;
           if (dataUrl) {
               img.src = dataUrl;
           }
@@ -847,9 +877,6 @@ function initUploadForm() {
           // Класс на следующем кадре, чтобы переход появления проигрался
           requestAnimationFrame(() => wrapper.classList.add('loaded'));
       }
-
-      updateFileLabel();
-      submitBtn.disabled = selectedFiles.length === 0 || uploading;
   }
 
   // Подпись зоны показывает, сколько выбрано и на какой объём
@@ -952,6 +979,18 @@ function initUploadForm() {
       });
   }
 
+  function wasRedirected(xhr) {
+      if (!xhr.responseURL) return false;
+      return new URL(xhr.responseURL).pathname !== new URL(form.action).pathname;
+  }
+
+  function describeHttpError(status) {
+      if (status === 413) return 'файл больше лимита сервера (413)';
+      if (status === 403) return 'сессия устарела, обновите страницу (403)';
+      if (status >= 500) return `ошибка на сервере (${status})`;
+      return `сервер ответил ${status || 'без статуса'}`;
+  }
+
   function setUploadStatus(message, kind) {
       if (!statusBox) return;
       statusBox.textContent = message;
@@ -993,12 +1032,17 @@ function initUploadForm() {
                   else setPreviewState(file, 'processing');
               });
 
-              // Истёкшая сессия отвечает HTML-редиректом на логин -
-              // отправляем пользователя туда вместо ошибки разбора JSON.
+              // Истёкшая сессия отвечает редиректом на логин: XHR проходит по нему
+              // и получает HTML с другого адреса - отправляем пользователя туда.
+              // Остальные ответы не в JSON (413 от nginx, 403 CSRF, 500) - ошибка
+              // этого файла, а не молчаливая перезагрузка страницы.
               const contentType = xhr.getResponseHeader('content-type') || '';
               if (!contentType.includes('application/json')) {
-                  window.location.href = xhr.responseURL || form.action;
-                  return;
+                  if (xhr.status < 400 && wasRedirected(xhr)) {
+                      window.location.href = xhr.responseURL;
+                      return;
+                  }
+                  throw new Error(describeHttpError(xhr.status));
               }
 
               const result = JSON.parse(xhr.responseText);
@@ -1012,15 +1056,17 @@ function initUploadForm() {
                       setPreviewState(file, 'done');
                   }
               } else {
-                  const detail =
+                  const reason =
                       (result.errors && result.errors[0]) || result.error || 'ошибка загрузки';
+                  // Ошибки обработки сервер подписывает именем файла, ошибки проверки - нет
+                  const detail = reason.startsWith(`${file.name}:`) ? reason : `${file.name}: ${reason}`;
                   failedFiles.push(file);
                   failedMessages.push(detail);
                   errorMessages.set(file, detail);
                   setPreviewState(file, 'error');
               }
           } catch (error) {
-              const detail = `${file.name}: сеть недоступна или сервер не ответил`;
+              const detail = `${file.name}: ${error && error.message ? error.message : 'сеть недоступна или сервер не ответил'}`;
               failedFiles.push(file);
               failedMessages.push(detail);
               errorMessages.set(file, detail);
@@ -1159,7 +1205,12 @@ async function fillFilmStrip() {
     const response = await fetch('/all_photos.json?page_size=60', { headers: { 'Accept': 'application/json' } });
     if (!response.ok) return;
     const photos = (await response.json()).photos || [];
-    const picked = photos.sort(() => Math.random() - 0.5).slice(0, frames.length);
+    // Тасование Фишера-Йейтса: sort со случайным компаратором перемешивает неравномерно
+    for (let i = photos.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [photos[i], photos[j]] = [photos[j], photos[i]];
+    }
+    const picked = photos.slice(0, frames.length);
     picked.forEach((photo, i) => {
       frames[i].style.backgroundImage = `url("${photo.url}")`;
     });

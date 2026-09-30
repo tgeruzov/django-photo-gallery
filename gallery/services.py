@@ -19,6 +19,7 @@ OPTIMIZED_IMAGE_SIZE = (2560, 2560)
 OPTIMIZED_IMAGE_QUALITY = 85
 MEDIUM_IMAGE_SIZE = (1600, 1600)
 MEDIUM_IMAGE_QUALITY = 84
+HIGH_BIT_DEPTH_MODES = ("I", "I;16", "I;16B", "I;16L", "I;16N")
 
 
 class ImageProcessingError(Exception):
@@ -49,7 +50,17 @@ def open_image(file_obj) -> Image.Image:
         img = ImageOps.exif_transpose(img)
     except Exception:
         logger.warning("Не удалось обработать EXIF ориентацию")
-    return img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
+
+    # Профиль RGB-снимка (Display P3, AdobeRGB) переносится в версии, иначе
+    # цвета бледнеют. Профиль CMYK или серого к RGB-результату не подходит.
+    icc_profile = img.info.get("icc_profile") if img.mode in ("RGB", "RGBA") else None
+
+    if img.mode in HIGH_BIT_DEPTH_MODES:
+        # 16-битный PNG: без масштабирования convert("L") обрезает всё в белый
+        img = img.convert("I").point(lambda value: value / 256).convert("L")
+    img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
+    img.info = {"icc_profile": icc_profile} if icc_profile else {}
+    return img
 
 
 def make_webp(img: Image.Image, size, quality, source_name, suffix) -> ContentFile:
@@ -57,7 +68,10 @@ def make_webp(img: Image.Image, size, quality, source_name, suffix) -> ContentFi
     copy = img.copy()
     copy.thumbnail(size, Image.Resampling.LANCZOS)
     buffer = BytesIO()
-    copy.save(buffer, format="WEBP", quality=quality, method=4)
+    save_options = {"format": "WEBP", "quality": quality, "method": 4}
+    if img.info.get("icc_profile"):
+        save_options["icc_profile"] = img.info["icc_profile"]
+    copy.save(buffer, **save_options)
     base_name = os.path.splitext(os.path.basename(source_name))[0]
     content = ContentFile(buffer.getvalue(), name=f"{base_name}{suffix}.webp")
     content.image_dimensions = copy.size
@@ -130,6 +144,19 @@ def ensure_photo_derivatives_by_id(photo_id: int) -> bool:
             if content.saved_name:
                 photo._meta.get_field(field_name).storage.delete(content.saved_name)
         raise
+
+
+def clear_variants(photo: Photo) -> None:
+    """Сбрасывает версии и их размеры, чтобы они построились заново.
+
+    Нужен при замене оригинала: старые версии показывали бы прежний снимок.
+    Сами файлы после сохранения удаляет django-cleanup.
+    """
+    for field_name in ("optimized_image", "medium_image", "thumbnail"):
+        setattr(photo, field_name, None)
+    for prefix in ("optimized", "medium", "thumbnail"):
+        setattr(photo, f"{prefix}_width", None)
+        setattr(photo, f"{prefix}_height", None)
 
 
 def should_delete_original(photo: Photo) -> bool:

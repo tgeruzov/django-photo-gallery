@@ -1,8 +1,22 @@
+import os
+import uuid
+
 from django.db import models
+from django.utils import timezone
+
+
+def original_upload_to(instance, filename):
+    """Оригинал хранится под случайным именем.
+
+    В нём остаётся EXIF, иногда с координатами съёмки, а имя вида IMG_1234.jpg
+    легко угадать по адресу в /media/.
+    """
+    extension = os.path.splitext(filename)[1].lower()
+    return timezone.now().strftime("photos/%Y/%m/%d/") + f"{uuid.uuid4().hex}{extension}"
 
 
 class Photo(models.Model):
-    image = models.ImageField(upload_to="photos/%Y/%m/%d/", verbose_name="Оригинальное изображение")
+    image = models.ImageField(upload_to=original_upload_to, verbose_name="Оригинальное изображение")
     optimized_image = models.ImageField(
         upload_to="optimized/%Y/%m/%d/",
         null=True,

@@ -1,0 +1,38 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: gallery
+          POSTGRES_USER: gallery
+          POSTGRES_PASSWORD: gallery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gallery -d gallery"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      DEBUG: "1"
+      DB_HOST: localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python manage.py test
+      - run: node --check static/js/script.js
