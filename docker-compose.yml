@@ -19,10 +19,11 @@ services:
     # Код и media/ смонтированы с хоста: root в разработке избавляет
     # от проблем с правами на запись. Образ для сервера работает от app.
     user: root
+    # devserver - runserver, который сам применяет новые миграции после обновления кода
     command: >
       sh -c "python manage.py migrate --noinput &&
              (python manage.py createsuperuser --noinput 2>/dev/null || true) &&
-             python manage.py runserver 0.0.0.0:8000"
+             python manage.py devserver 0.0.0.0:8000"
     volumes:
       - .:/app
     environment:

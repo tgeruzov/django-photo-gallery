@@ -405,6 +405,64 @@ class ManageTests(MediaTestCase):
         self.assertEqual([positions[p.pk] for p in reversed(self.photos)], [0, 1, 2, 3])
 
 
+class DevserverTests(TestCase):
+    """Сервер разработки сам применяет миграции, когда появляются новые файлы."""
+
+    def setUp(self):
+        from gallery.management.commands import devserver
+
+        self.devserver = devserver
+        self.command = devserver.Command()
+
+    def test_applies_only_pending_migrations(self):
+        with (
+            mock.patch.object(self.devserver, "pending_migrations", return_value=[]),
+            mock.patch.object(self.devserver, "call_command") as call_command,
+        ):
+            self.command.apply_migrations()
+        call_command.assert_not_called()
+
+        self.command.fingerprint = None
+        with (
+            mock.patch.object(self.devserver, "pending_migrations", return_value=["0005"]),
+            mock.patch.object(self.devserver, "call_command") as call_command,
+        ):
+            self.command.apply_migrations()
+        call_command.assert_called_once_with("migrate", interactive=False)
+
+    def test_checks_again_only_when_migration_files_change(self):
+        with (
+            mock.patch.object(self.devserver, "pending_migrations", return_value=[]) as pending,
+            mock.patch.object(self.devserver, "migrations_fingerprint", return_value=("a",)),
+        ):
+            self.command.apply_migrations_if_changed()
+            self.command.apply_migrations_if_changed()
+        self.assertEqual(pending.call_count, 1)
+
+        with (
+            mock.patch.object(self.devserver, "pending_migrations", return_value=[]) as pending,
+            mock.patch.object(self.devserver, "migrations_fingerprint", return_value=("a", "b")),
+        ):
+            self.command.apply_migrations_if_changed()
+        self.assertEqual(pending.call_count, 1)
+
+    def test_broken_migration_does_not_stop_the_server(self):
+        self.command.stderr = mock.Mock()
+        with mock.patch.object(
+            self.devserver, "pending_migrations", side_effect=RuntimeError("broken")
+        ):
+            self.command.apply_migrations()
+
+        self.assertIsNone(self.command.fingerprint)
+        self.command.stderr.write.assert_called_once()
+
+    def test_fingerprint_covers_project_migrations_only(self):
+        paths = [path for path, _ in self.devserver.migrations_fingerprint()]
+
+        self.assertTrue(any(path.endswith("0004_photo_position.py") for path in paths))
+        self.assertFalse(any("site-packages" in path for path in paths))
+
+
 class ServiceEndpointTests(TestCase):
     def test_healthz_ok(self):
         response = self.client.get(reverse("healthz"))
