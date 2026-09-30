@@ -55,7 +55,7 @@ docker compose up --build
 <p align="center">
   <img src="docs/images/lightbox.jpg" width="560" alt="Просмотр фото: снимок на весь экран, счётчик 04 / 12 и едва заметные крестик и стрелки">
   &nbsp;&nbsp;
-  <img src="docs/images/mobile.jpg" width="162" alt="Галерея на телефоне: по два снимка в строке">
+  <img src="docs/images/mobile.jpg" width="162" alt="Галерея на телефоне: имя и иконка управления в шапке, по два-три снимка в строке">
 </p>
 
 ### Управление
