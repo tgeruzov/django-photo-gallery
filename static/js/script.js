@@ -995,7 +995,18 @@ function initWordmark() {
     mask.className = 'wordmark-word';
     mask.setAttribute('aria-hidden', 'true');
     const inner = document.createElement('span');
-    inner.textContent = word;
+    // Кернинг Geist задвигает "i" под перекладину "T", и точка над "i" почти
+    // упирается в неё: раздвигаем только эту пару
+    word.split(/(?<=T)(?=i)/).forEach((part, partIndex, parts) => {
+      if (partIndex < parts.length - 1) {
+        const kern = document.createElement('span');
+        kern.className = 'wordmark-kern';
+        kern.textContent = part;
+        inner.appendChild(kern);
+      } else {
+        inner.append(part);
+      }
+    });
     inner.style.setProperty('--i', String(index));
     mask.appendChild(inner);
     source.appendChild(mask);

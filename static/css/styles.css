@@ -142,6 +142,10 @@ img {
   display: inline-block;
 }
 
+.wordmark-kern {
+  margin-right: 0.03em;
+}
+
 .js .wordmark-word > span {
   animation: word-in 0.9s var(--ease) both;
   animation-delay: calc(var(--i) * 90ms + 80ms);
