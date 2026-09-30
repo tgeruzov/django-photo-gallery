@@ -86,8 +86,7 @@ function initLightbox(gallery, feed) {
   const closeBtn = lightbox.querySelector('.lightbox-close');
   const prevBtn = lightbox.querySelector('.lightbox-prev');
   const nextBtn = lightbox.querySelector('.lightbox-next');
-  const counterEl = lightbox.querySelector('.lightbox-counter');
-  const counter = counterEl ? createSplitFlap(counterEl) : null;
+  const counter = lightbox.querySelector('.lightbox-counter');
   const zoom = setupGestures(lightbox, lightboxImg, {
     prev: prevPhoto,
     next: nextPhoto,
@@ -119,7 +118,7 @@ function initLightbox(gallery, feed) {
   function updateCounter() {
     if (!counter) return;
     if (currentIndex < 0 || !allPhotos.length) return;
-    counter.set(`${pad(currentIndex + 1)} / ${pad(allPhotos.length)}`);
+    counter.textContent = `${pad(currentIndex + 1)} / ${pad(allPhotos.length)}`;
   }
 
   function preloadNeighbors(index) {
@@ -226,8 +225,22 @@ function initLightbox(gallery, feed) {
     }
   }
 
+  // Через 2.5 секунды без движения управление гаснет, остаётся только фото
+  let idleTimer = null;
+  function wake() {
+    lightbox.classList.remove('is-idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => lightbox.classList.add('is-idle'), 2500);
+  }
+  ['pointermove', 'pointerdown'].forEach(ev => lightbox.addEventListener(ev, wake, { passive: true }));
+  // Tab показывает управление для навигации с клавиатуры; стрелки нет - при листании оно бы мигало
+  lightbox.addEventListener('keydown', e => {
+    if (e.key === 'Tab') wake();
+  });
+
   function openLightbox(index) {
     if (closing) finishClose();
+    wake();
     lastFocused = document.activeElement;
     lightbox.classList.add('active');
     lightbox.setAttribute('aria-hidden', 'false');
@@ -240,6 +253,8 @@ function initLightbox(gallery, feed) {
   function closeLightbox() {
     if (closing || !lightbox.classList.contains('active')) return;
     closing = true;
+    clearTimeout(idleTimer);
+    lightbox.classList.remove('is-idle');
     zoom.reset();
 
     const sourceEl = currentIndex >= 0 && allPhotos[currentIndex] ? allPhotos[currentIndex].el : null;

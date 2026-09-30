@@ -350,6 +350,9 @@ img {
   cursor: grab;
 }
 
+/* Управление лайтбоксом отступает перед фото: приглушённый текст без рамок,
+   стрелки проступают только при наведении на край, при бездействии всё гаснет */
+
 .lightbox-bar {
   position: absolute;
   top: 0;
@@ -360,55 +363,82 @@ img {
   align-items: center;
   justify-content: space-between;
   padding: var(--pad);
-  font: 500 12px/1 var(--mono);
-  letter-spacing: 0.06em;
+  font: 400 11px/1 var(--mono);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.lightbox-counter {
+  font-variant-numeric: tabular-nums;
 }
 
 .lightbox-close {
-  padding: 4px 0;
+  padding: 6px 0;
   border: 0;
-  border-bottom: 1.5px solid var(--ink);
   background: none;
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
+  color: inherit;
   cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.2s var(--ease);
 }
 
-.lightbox-close:hover {
-  border-color: var(--accent);
+.lightbox-close:hover,
+.lightbox-close:focus-visible {
+  color: var(--ink);
 }
 
+/* Невидимая зона вдоль края экрана: не заходит на фото, чтобы не мешать жестам */
 .lightbox-nav {
   position: absolute;
-  top: 50%;
+  top: 64px;
+  bottom: 64px;
   z-index: 2;
-  width: 48px;
-  height: 48px;
-  margin-top: -24px;
+  width: calc(var(--pad) + 64px);
   padding: 0;
   display: grid;
   place-items: center;
-  border: var(--rule);
-  background: var(--paper);
+  border: 0;
+  background: none;
+  color: var(--ink);
   cursor: pointer;
 }
 
-.lightbox-nav:hover {
-  background: var(--ink);
-  color: var(--paper);
-}
-
 .lightbox-prev {
-  left: var(--pad);
+  left: 0;
 }
 
 .lightbox-next {
-  right: var(--pad);
+  right: 0;
 }
 
-.lightbox-nav svg,
+.lightbox-nav svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  opacity: 0.18;
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+}
+
+.lightbox-nav:hover svg,
+.lightbox-nav:focus-visible svg {
+  opacity: 0.85;
+}
+
+.lightbox-prev:hover svg {
+  transform: translateX(-3px);
+}
+
+.lightbox-next:hover svg {
+  transform: translateX(3px);
+}
+
 .to-top svg {
   width: 20px;
   height: 20px;
@@ -420,13 +450,25 @@ img {
 .lightbox-bar,
 .lightbox-nav {
   opacity: 0;
-  transition: opacity 0.2s var(--ease);
+  transition: opacity 0.4s var(--ease);
 }
 
 .lightbox.active .lightbox-bar,
 .lightbox.active .lightbox-nav {
   opacity: 1;
-  transition-delay: 0.15s;
+  transition-delay: 0.2s;
+}
+
+/* Бездействие: остаётся только фото, курсор тоже прячется */
+.lightbox.active.is-idle .lightbox-bar,
+.lightbox.active.is-idle .lightbox-nav {
+  opacity: 0;
+  transition: opacity 0.8s var(--ease);
+}
+
+.lightbox.active.is-idle,
+.lightbox.active.is-idle * {
+  cursor: none;
 }
 
 @media (max-width: 640px) {
@@ -806,10 +848,6 @@ img {
 
 .flap-sep {
   padding: 0 0.12em;
-}
-
-.lightbox-counter.flap {
-  font-size: 16px;
 }
 
 @media (prefers-reduced-motion: reduce) {
