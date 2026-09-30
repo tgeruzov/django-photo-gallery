@@ -82,8 +82,8 @@ function initLightbox(gallery, feed) {
   let currentIndex = -1;
   let lastFocused = null;
   let closing = false;
-  const OPEN_MS = 650;
-  const CLOSE_MS = 550;
+  const OPEN_MS = 420;
+  const CLOSE_MS = 340;
   const EASE_OPEN = 'cubic-bezier(0.22, 1, 0.36, 1)';
   const EASE_CLOSE = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
@@ -174,7 +174,7 @@ function initLightbox(gallery, feed) {
   // затем сама карточка мягко проявляется на месте. FLIP через WAAPI.
   // При "уменьшении движения" полёт из карточки заменяется спокойным проявлением
   const canAnimate = () => typeof lightboxImg.animate === 'function';
-  const CALM_MS = 400;
+  const CALM_MS = 260;
   function fade(from, to, done) {
     const animation = lightboxImg.animate([{ opacity: from }, { opacity: to }], {
       duration: CALM_MS,
@@ -306,7 +306,7 @@ function initLightbox(gallery, feed) {
         settleAnimation(animation, CLOSE_MS + 200, () => {
           finishClose();
           sourceEl.style.visibility = '';
-          sourceEl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
+          sourceEl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
         });
         return;
       }

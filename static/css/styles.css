@@ -363,7 +363,7 @@ img {
   visibility: hidden;
   pointer-events: none;
   touch-action: none;
-  transition: visibility 0s linear 0.6s;
+  transition: visibility 0s linear 0.4s;
 }
 
 .lightbox::before {
@@ -372,7 +372,7 @@ img {
   inset: 0;
   background: var(--paper);
   opacity: 0;
-  transition: opacity 0.5s var(--ease);
+  transition: opacity 0.3s var(--ease);
 }
 
 .lightbox.active {
