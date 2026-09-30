@@ -286,7 +286,7 @@ img {
   margin: 0 0 24px;
   font-size: clamp(1.6rem, 1rem + 2.4vw, 3rem);
   font-weight: 600;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.015em;
   color: var(--muted);
 }
 
@@ -594,7 +594,8 @@ img {
   font-size: clamp(2rem, 1.2rem + 3vw, 4rem);
   font-weight: 700;
   line-height: 0.95;
-  letter-spacing: -0.045em;
+  /* У кириллицы плотный рисунок: при -0.045em пары вроде "аг" и "ра" слипались */
+  letter-spacing: -0.015em;
 }
 
 .dropzone {
@@ -627,7 +628,7 @@ img {
 .dropzone-text {
   font-size: 1.25rem;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
 .dropzone-hint {
