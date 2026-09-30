@@ -78,7 +78,10 @@ function initLightbox(gallery, feed) {
   let currentIndex = -1;
   let lastFocused = null;
   let closing = false;
-  const ENLARGE_MS = 300;
+  const OPEN_MS = 650;
+  const CLOSE_MS = 550;
+  const EASE_OPEN = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  const EASE_CLOSE = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
   const closeBtn = lightbox.querySelector('.lightbox-close');
   const prevBtn = lightbox.querySelector('.lightbox-prev');
@@ -127,36 +130,37 @@ function initLightbox(gallery, feed) {
     });
   }
 
-  function showPhoto(index, direction) {
+  // Смена кадра без анимации: переход только при открытии из сетки и закрытии.
+  // Если полная версия уже в кэше (соседи предзагружаются), она встаёт сразу;
+  // иначе показывается миниатюра и подменяется по загрузке.
+  function showPhoto(index, { opening = false } = {}) {
     if (index < 0 || index >= allPhotos.length) return;
     currentIndex = index;
     const photo = allPhotos[index];
     zoom.reset();
 
-    // Направленный вход нового кадра: класс перевешивается с reflow,
-    // чтобы анимация проигрывалась на каждом перелистывании.
-    lightboxImg.classList.remove('slide-from-left', 'slide-from-right');
-    if (direction) {
-      void lightboxImg.offsetWidth;
-      lightboxImg.classList.add(direction === 'next' ? 'slide-from-right' : 'slide-from-left');
-    }
-
-    // Blur-up: сразу показываем миниатюру из кэша, полную версию подменяем по загрузке
     const fullUrl = pickFullUrl(photo);
-    lightboxImg.classList.add('is-loading');
-    lightboxImg.src = photo.url;
+    const full = new Image();
+    full.src = fullUrl;
     lightboxImg.alt = photo.alt;
 
-    const full = new Image();
-    full.onload = () => {
-      if (currentIndex !== index) return;
-      lightboxImg.src = fullUrl;
+    if (full.complete && full.naturalWidth) {
       lightboxImg.classList.remove('is-loading');
-    };
-    full.onerror = () => {
-      if (currentIndex === index) lightboxImg.classList.remove('is-loading');
-    };
-    full.src = fullUrl;
+      lightboxImg.src = fullUrl;
+    } else {
+      // Размытие только при открытии: при листании оно мигало бы на каждом кадре
+      lightboxImg.classList.toggle('is-loading', opening);
+      lightboxImg.src = photo.url;
+      const swap = () => {
+        if (currentIndex !== index) return;
+        lightboxImg.src = fullUrl;
+        lightboxImg.classList.remove('is-loading');
+      };
+      full.onload = swap;
+      full.onerror = () => {
+        if (currentIndex === index) lightboxImg.classList.remove('is-loading');
+      };
+    }
 
     updateCounter();
     preloadNeighbors(index);
@@ -197,12 +201,13 @@ function initLightbox(gallery, feed) {
       lightboxImg.style.transformOrigin = 'top left';
       const animation = lightboxImg.animate(
         [
-          { transform: frameToCard(to, sourceEl), opacity: 0 },
-          { transform: 'none', opacity: 1 },
+          { transform: frameToCard(to, sourceEl), opacity: 0, offset: 0 },
+          { opacity: 1, offset: 0.35 },
+          { transform: 'none', opacity: 1, offset: 1 },
         ],
-        { duration: ENLARGE_MS, easing: 'ease' }
+        { duration: OPEN_MS, easing: EASE_OPEN }
       );
-      settleAnimation(animation, ENLARGE_MS + 200, () => {
+      settleAnimation(animation, OPEN_MS + 200, () => {
         lightboxImg.style.transformOrigin = '';
         sourceEl.style.visibility = '';
       });
@@ -227,7 +232,7 @@ function initLightbox(gallery, feed) {
     lightbox.classList.add('active');
     lightbox.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
-    showPhoto(index);
+    showPhoto(index, { opening: true });
     zoomFromCard(allPhotos[index] ? allPhotos[index].el : null);
     if (closeBtn) closeBtn.focus({ preventScroll: true });
   }
@@ -255,15 +260,16 @@ function initLightbox(gallery, feed) {
         lightboxImg.style.transformOrigin = 'top left';
         const animation = lightboxImg.animate(
           [
-            { transform: 'none', opacity: 1 },
-            { transform: frameToCard(from, sourceEl), opacity: 0 },
+            { transform: 'none', opacity: 1, offset: 0 },
+            { opacity: 1, offset: 0.6 },
+            { transform: frameToCard(from, sourceEl), opacity: 0, offset: 1 },
           ],
-          { duration: ENLARGE_MS, easing: 'ease-out', fill: 'forwards' }
+          { duration: CLOSE_MS, easing: EASE_CLOSE, fill: 'forwards' }
         );
-        settleAnimation(animation, ENLARGE_MS + 200, () => {
+        settleAnimation(animation, CLOSE_MS + 200, () => {
           finishClose();
           sourceEl.style.visibility = '';
-          sourceEl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ENLARGE_MS, easing: 'ease-out' });
+          sourceEl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
         });
         return;
       }
@@ -276,9 +282,9 @@ function initLightbox(gallery, feed) {
           { transform: 'none', opacity: 1 },
           { transform: 'scale(0.94)', opacity: 0 },
         ],
-        { duration: ENLARGE_MS, easing: 'ease-out', fill: 'forwards' }
+        { duration: CLOSE_MS, easing: EASE_CLOSE, fill: 'forwards' }
       );
-      settleAnimation(animation, ENLARGE_MS + 200, finishClose);
+      settleAnimation(animation, CLOSE_MS + 200, finishClose);
       return;
     }
 
@@ -286,12 +292,12 @@ function initLightbox(gallery, feed) {
   }
 
   function prevPhoto() {
-    if (currentIndex > 0) showPhoto(currentIndex - 1, 'prev');
+    if (currentIndex > 0) showPhoto(currentIndex - 1);
   }
 
   async function nextPhoto() {
     if (currentIndex < allPhotos.length - 1) {
-      showPhoto(currentIndex + 1, 'next');
+      showPhoto(currentIndex + 1);
       return;
     }
     if (!feed.hasMore()) return;
@@ -299,7 +305,7 @@ function initLightbox(gallery, feed) {
     if (!appended || !lightbox.classList.contains('active')) return;
     allPhotos = getVisiblePhotos();
     if (currentIndex < allPhotos.length - 1) {
-      showPhoto(currentIndex + 1, 'next');
+      showPhoto(currentIndex + 1);
     } else {
       updateCounter();
     }
@@ -393,15 +399,19 @@ function setupGestures(lightbox, img, actions) {
     apply();
   }
 
+  // Мгновенный сброс: без transition, иначе новый кадр "доезжал" бы на место
   function reset() {
     scale = 1;
     tx = 0;
     ty = 0;
     pointers.clear();
     mode = null;
+    img.style.transition = 'none';
     img.classList.remove('is-dragging');
     img.style.opacity = '';
     apply();
+    void img.offsetWidth;
+    img.style.transition = '';
   }
 
   const points = () => Array.from(pointers.values());
@@ -464,7 +474,6 @@ function setupGestures(lightbox, img, actions) {
         axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
       }
       if (axis !== 'x') return;
-      img.classList.remove('slide-from-left', 'slide-from-right');
       img.classList.add('is-dragging');
       img.style.transform = `translateX(${dx}px)`;
       img.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / window.innerWidth));
@@ -487,14 +496,19 @@ function setupGestures(lightbox, img, actions) {
     if (mode === 'swipe' && !cancelled) {
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
-      img.classList.remove('is-dragging');
-      img.style.transform = '';
-      img.style.opacity = '';
       if (axis === 'x' && Math.abs(dx) > 60) {
+        // Новый кадр встаёт на место сразу, без "доезда" от пальца
         if (dx > 0) actions.prev();
         else actions.next();
+        reset();
       } else if (axis === 'y' && dy > 70) {
+        reset();
         actions.close();
+      } else {
+        // Жест не дотянул - кадр плавно возвращается на место
+        img.classList.remove('is-dragging');
+        img.style.transform = '';
+        img.style.opacity = '';
       }
     }
     mode = null;
@@ -965,73 +979,26 @@ function initUploadForm() {
 
 // Эффекты по мотивам React Bits (reactbits.dev), переписанные без React и GSAP
 
-const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
-
-// Split Text + Variable Proximity: буквы имени въезжают из-под маски,
-// а рядом с курсором становятся жирнее (вариативная ось wght у Geist).
+// Split Text: слова имени въезжают из-под маски по очереди.
+// Делим только на слова - деление на буквы ломало кернинг шрифта.
 function initWordmark() {
   const wordmark = document.querySelector('.wordmark');
   const source = wordmark && wordmark.querySelector('.wordmark-text');
   if (!source) return;
 
-  const FROM = 500;
-  const TO = 800;
-  const RADIUS = 220;
-  const letters = [];
   const label = source.textContent.trim();
-  source.textContent = '';
   wordmark.setAttribute('aria-label', label);
-
-  label.split(' ').forEach((word, wordIndex) => {
-    if (wordIndex) source.append(' ');
-    const wordEl = document.createElement('span');
-    wordEl.className = 'wordmark-word';
-    wordEl.setAttribute('aria-hidden', 'true');
-    word.split('').forEach(char => {
-      const letter = document.createElement('span');
-      letter.className = 'wordmark-letter';
-      letter.textContent = char;
-      letter.style.setProperty('--i', String(letters.length));
-      wordEl.appendChild(letter);
-      letters.push(letter);
-    });
-    source.appendChild(wordEl);
-  });
-
-  if (!finePointer.matches) return;
-
-  let pointer = null;
-  let scheduled = false;
-
-  const update = () => {
-    scheduled = false;
-    letters.forEach(letter => {
-      let weight = FROM;
-      if (pointer) {
-        const rect = letter.getBoundingClientRect();
-        const distance = Math.hypot(
-          pointer.x - (rect.left + rect.width / 2),
-          pointer.y - (rect.top + rect.height / 2)
-        );
-        // Гауссов спад: плавный пик у курсора без резкой границы радиуса
-        const strength = Math.exp(-((distance / (RADIUS / 2)) ** 2) / 2);
-        weight = FROM + (TO - FROM) * strength;
-      }
-      letter.style.fontVariationSettings = `'wght' ${weight.toFixed(0)}`;
-    });
-  };
-
-  window.addEventListener('pointermove', e => {
-    pointer = { x: e.clientX, y: e.clientY };
-    if (!scheduled) {
-      scheduled = true;
-      requestAnimationFrame(update);
-    }
-  }, { passive: true });
-
-  document.documentElement.addEventListener('pointerleave', () => {
-    pointer = null;
-    requestAnimationFrame(update);
+  source.textContent = '';
+  label.split(' ').forEach((word, index) => {
+    if (index) source.append(' ');
+    const mask = document.createElement('span');
+    mask.className = 'wordmark-word';
+    mask.setAttribute('aria-hidden', 'true');
+    const inner = document.createElement('span');
+    inner.textContent = word;
+    inner.style.setProperty('--i', String(index));
+    mask.appendChild(inner);
+    source.appendChild(mask);
   });
 }
 

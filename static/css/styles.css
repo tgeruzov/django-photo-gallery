@@ -112,43 +112,42 @@ img {
 
 .masthead {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: calc(var(--pad) * 1.5) var(--pad) var(--pad);
+  padding: calc(var(--pad) * 0.75) var(--pad);
   margin-bottom: var(--gap);
   border-bottom: var(--rule);
 }
 
 .wordmark {
-  font-size: clamp(2.2rem, 1.1rem + 4.6vw, 6rem);
-  font-weight: 500;
-  line-height: 0.88;
-  letter-spacing: -0.05em;
+  font-size: clamp(1.6rem, 1rem + 1.8vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.035em;
   text-decoration: none;
+  font-kerning: normal;
 }
 
+/* Слова въезжают из-под маски снизу, по очереди */
 .wordmark-word {
   display: inline-block;
   overflow: hidden;
-  padding-bottom: 0.06em;
-  margin-bottom: -0.06em;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
   vertical-align: bottom;
 }
 
-.wordmark-letter {
+.wordmark-word > span {
   display: inline-block;
-  font-variation-settings: "wght" 500;
-  transition: font-variation-settings 0.25s var(--ease);
 }
 
-/* Буквы въезжают из-под маски снизу, по очереди */
-.js .wordmark-letter {
-  animation: letter-in 0.8s var(--ease) both;
-  animation-delay: calc(var(--i) * 32ms + 80ms);
+.js .wordmark-word > span {
+  animation: word-in 0.9s var(--ease) both;
+  animation-delay: calc(var(--i) * 90ms + 80ms);
 }
 
-@keyframes letter-in {
+@keyframes word-in {
   from { transform: translateY(105%); }
 }
 
@@ -247,6 +246,7 @@ img {
 .empty-state {
   flex-basis: 100%;
   padding: 18vh 0;
+  text-align: center;
 }
 
 .empty-state-title {
@@ -295,7 +295,7 @@ img {
   visibility: hidden;
   pointer-events: none;
   touch-action: none;
-  transition: visibility 0s linear 0.35s;
+  transition: visibility 0s linear 0.6s;
 }
 
 .lightbox::before {
@@ -304,7 +304,7 @@ img {
   inset: 0;
   background: var(--paper);
   opacity: 0;
-  transition: opacity 0.3s var(--ease);
+  transition: opacity 0.5s var(--ease);
 }
 
 .lightbox.active {
@@ -337,22 +337,6 @@ img {
 
 .lightbox img.is-zoomed {
   cursor: grab;
-}
-
-.lightbox img.slide-from-right {
-  animation: lb-slide-right 0.3s var(--ease);
-}
-
-.lightbox img.slide-from-left {
-  animation: lb-slide-left 0.3s var(--ease);
-}
-
-@keyframes lb-slide-right {
-  from { opacity: 0; transform: translateX(32px); }
-}
-
-@keyframes lb-slide-left {
-  from { opacity: 0; transform: translateX(-32px); }
 }
 
 .lightbox-bar {
@@ -541,8 +525,27 @@ img {
 
 .upload,
 .error-page {
-  padding: var(--pad);
+  width: 100%;
   max-width: 1100px;
+  margin: 0 auto;
+  padding: calc(var(--pad) * 1.5) var(--pad);
+  text-align: center;
+}
+
+.upload form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.upload .dropzone,
+.upload .previews {
+  align-self: stretch;
+}
+
+.upload .alert,
+#upload-status {
+  text-align: left;
 }
 
 .page-title {
@@ -687,7 +690,7 @@ img {
 
 .error-page p:not(.error-code) {
   max-width: 44ch;
-  margin: 0 0 32px;
+  margin: 0 auto 32px;
   color: var(--muted);
 }
 
@@ -791,7 +794,7 @@ img {
 }
 
 .flap-sep {
-  padding: 0 0.3em;
+  padding: 0 0.12em;
 }
 
 .lightbox-counter.flap {
