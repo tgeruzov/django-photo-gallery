@@ -650,9 +650,11 @@ img {
 .preview-wrapper {
   position: relative;
   aspect-ratio: 5 / 3;
+  overflow: hidden;
   background: var(--paper-2);
   opacity: 0;
   transition: opacity 0.3s var(--ease);
+  --progress: 0;
 }
 
 .preview-wrapper.loaded {
@@ -668,51 +670,197 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: opacity 0.4s var(--ease), filter 0.4s var(--ease);
+}
+
+/* Затемнение углов под крестиком и подписью - чтобы они читались на любом фото */
+.preview-wrapper::before,
+.preview-wrapper::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 55%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+
+.preview-wrapper::before {
+  top: 0;
+  background: linear-gradient(200deg, rgba(0, 0, 0, 0.6), transparent 60%);
+}
+
+.preview-wrapper::after {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
 }
 
 .remove-preview {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 28px;
-  height: 28px;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
   padding: 0;
   border: 0;
-  background: var(--ink);
-  color: var(--paper);
-  font-size: 18px;
-  line-height: 1;
+  background: none;
+  color: var(--ink);
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.remove-preview svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
 }
 
 .remove-preview:hover {
-  background: var(--accent);
+  color: var(--accent);
 }
 
-.previews.is-busy .remove-preview {
+/* Крестик виден при наведении на плитку, на сенсорных экранах - всегда */
+.preview-wrapper:hover::before,
+.preview-wrapper:hover .remove-preview,
+.remove-preview:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .preview-wrapper::before,
+  .remove-preview {
+    opacity: 1;
+  }
+}
+
+.previews.is-busy .remove-preview,
+.previews.is-busy .preview-wrapper::before {
   display: none;
 }
 
-/* Статус файла - текстовая плашка в углу превью */
-.preview-wrapper.is-uploading::after,
-.preview-wrapper.is-done::after,
-.preview-wrapper.is-duplicate::after,
-.preview-wrapper.is-error::after {
+/* Строка состояния внизу плитки */
+.preview-status {
+  position: absolute;
+  left: 8px;
+  bottom: 7px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: 400 10px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+
+.preview-check {
+  display: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+}
+
+.preview-progress {
   position: absolute;
   left: 0;
   bottom: 0;
-  padding: 4px 6px;
-  background: var(--ink);
-  color: var(--paper);
-  font: 500 10px/1 var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  z-index: 2;
+  height: 2px;
+  width: 100%;
+  background: var(--accent);
+  transform: scaleX(var(--progress));
+  transform-origin: left;
+  opacity: 0;
+  transition: transform 0.25s var(--ease), opacity 0.3s var(--ease);
 }
 
-.preview-wrapper.is-uploading::after { content: "Загрузка"; }
-.preview-wrapper.is-done::after { content: "Готово"; }
-.preview-wrapper.is-duplicate::after { content: "Дубль"; }
-.preview-wrapper.is-error::after { content: "Ошибка"; background: var(--accent); }
+/* Подпись и нижнее затемнение показываются во всех состояниях, кроме очереди */
+.is-uploading::after,
+.is-processing::after,
+.is-done::after,
+.is-duplicate::after,
+.is-error::after,
+.is-uploading .preview-status,
+.is-processing .preview-status,
+.is-done .preview-status,
+.is-duplicate .preview-status,
+.is-error .preview-status {
+  opacity: 1;
+}
+
+/* В очереди: фото приглушено, пока не дошла его очередь */
+.is-queued .preview-image {
+  opacity: 0.3;
+}
+
+/* Загрузка: полоска заполняется по реальному прогрессу отправки */
+.is-uploading .preview-image,
+.is-processing .preview-image {
+  opacity: 0.6;
+}
+
+.is-uploading .preview-progress {
+  opacity: 1;
+}
+
+/* Обработка на сервере: по полоске бежит блик */
+.is-processing .preview-progress {
+  opacity: 1;
+  transform: none;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent) no-repeat;
+  background-size: 50% 100%;
+  animation: preview-scan 1s linear infinite;
+}
+
+@keyframes preview-scan {
+  from { background-position: -100% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* Готово: полное фото и тонкая галочка */
+.is-done .preview-check {
+  display: block;
+  animation: check-in 0.35s var(--ease) both;
+}
+
+@keyframes check-in {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+/* Уже есть в галерее: чёрно-белое и приглушённое */
+.is-duplicate .preview-image {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.is-duplicate .preview-status {
+  color: var(--muted);
+}
+
+/* Ошибка: приглушённое фото, оранжевая линия и подпись */
+.is-error .preview-image {
+  opacity: 0.4;
+}
+
+.is-error .preview-status {
+  color: var(--accent);
+}
+
+.is-error .preview-progress {
+  opacity: 1;
+  transform: none;
+}
 
 #upload-status {
   margin: 24px 0 0;
