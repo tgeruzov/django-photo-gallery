@@ -1071,11 +1071,63 @@ img {
   color: var(--muted);
 }
 
+/* "Уменьшение движения": вместо перемещений и увеличений - спокойные
+   проявления. Анимации не выключаются целиком, чтобы сайт не выглядел мёртвым */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
+  html {
+    scroll-behavior: auto;
   }
+
+  .js .wordmark.intro .wordmark-letter,
+  .js .wordmark.intro .wordmark-dot {
+    animation-name: calm-fade;
+    animation-delay: 0s;
+  }
+
+  .js .card img {
+    transform: none;
+  }
+
+  .js .film {
+    animation-name: calm-fade;
+  }
+
+  /* Кнопка-плёнка: следующий кадр проявляется поверх, без протяжки */
+  .film-strip {
+    position: relative;
+    transition: none;
+  }
+
+  .film-strip > span + span {
+    position: absolute;
+    inset: 0;
+    border-left: 0;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .button--film:hover .film-strip,
+  .button--film:focus-visible .film-strip,
+  .button--film:active .film-strip {
+    transform: none;
+  }
+
+  .button--film:hover .film-strip > span + span,
+  .button--film:focus-visible .film-strip > span + span,
+  .button--film:active .film-strip > span + span {
+    opacity: 1;
+  }
+
+  .is-processing .preview-progress {
+    background: var(--accent);
+    animation: calm-pulse 1.2s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes calm-fade {
+  from { opacity: 0; }
+}
+
+@keyframes calm-pulse {
+  to { opacity: 0.35; }
 }

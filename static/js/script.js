@@ -168,7 +168,17 @@ function initLightbox(gallery, feed) {
   // Переходы в духе DomeGallery (React Bits): фото вырастает из карточки,
   // одновременно проявляясь, а при закрытии сжимается в неё, растворяясь;
   // затем сама карточка мягко проявляется на месте. FLIP через WAAPI.
-  const canAnimate = () => typeof lightboxImg.animate === 'function' && !reduceMotion.matches;
+  // При "уменьшении движения" полёт из карточки заменяется спокойным проявлением
+  const canAnimate = () => typeof lightboxImg.animate === 'function';
+  const CALM_MS = 400;
+  function fade(from, to, done) {
+    const animation = lightboxImg.animate([{ opacity: from }, { opacity: to }], {
+      duration: CALM_MS,
+      easing: 'ease',
+      fill: 'forwards',
+    });
+    settleAnimation(animation, CALM_MS + 200, done || (() => animation.cancel()));
+  }
 
   // Трансформация, которая кладёт кадр лайтбокса ровно на прямоугольник карточки
   function frameToCard(frame, cardEl) {
@@ -194,6 +204,10 @@ function initLightbox(gallery, feed) {
     if (!canAnimate() || !sourceEl) return;
 
     const fly = () => {
+      if (reduceMotion.matches) {
+        fade(0, 1);
+        return;
+      }
       const to = lightboxImg.getBoundingClientRect();
       if (!to.width || !sourceEl.getBoundingClientRect().width) return;
       sourceEl.style.visibility = 'hidden';
@@ -267,6 +281,10 @@ function initLightbox(gallery, feed) {
     lastFocused = null;
 
     const hasImage = Boolean(lightboxImg.getAttribute('src'));
+    if (canAnimate() && hasImage && reduceMotion.matches) {
+      fade(1, 0, finishClose);
+      return;
+    }
     if (canAnimate() && hasImage && sourceEl && sourceEl.isConnected) {
       const to = sourceEl.getBoundingClientRect();
       const from = lightboxImg.getBoundingClientRect();
@@ -1085,11 +1103,8 @@ function initWordmark() {
   wordmark.classList.add('is-split', 'intro');
 
   const endIntro = () => wordmark.classList.remove('intro');
-  if (reduceMotion.matches) endIntro();
-  else {
-    dot.addEventListener('animationend', endIntro, { once: true });
-    setTimeout(endIntro, 2500); // если анимация не отыграла (фоновая вкладка)
-  }
+  dot.addEventListener('animationend', endIntro, { once: true });
+  setTimeout(endIntro, 2500); // если анимация не отыграла (фоновая вкладка)
 
   if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
 
