@@ -4,7 +4,7 @@
 
 **Персональная фотогалерея на Django**
 
-![Version](https://img.shields.io/badge/version-0.5.2-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.5.3-blue?style=flat-square)
 [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue?style=flat-square)](./LICENSE)
 
 </div>

@@ -508,51 +508,73 @@ img {
   cursor: not-allowed;
 }
 
-/* Кнопка со стрелкой: оранжевая заливка протягивается слева направо,
-   как плёнка в камере, стрелка сдвигается вперёд */
-.button--advance {
+/* Кнопка-плёнка: при наведении рывками протягивается ко второму кадру,
+   как плёнка в камере */
+.button--film {
   position: relative;
-  gap: 14px;
+  width: 184px;
+  padding: 0;
   overflow: hidden;
-  isolation: isolate;
-  padding: 0 20px 0 24px;
+  background: var(--tile);
+  color: var(--ink);
 }
 
-.button--advance::before {
+.button--film:hover:not(:disabled) {
+  background: var(--tile);
+}
+
+/* Перфорация сверху и снизу */
+.button--film::before,
+.button--film::after {
   content: "";
   position: absolute;
-  inset: 0;
-  z-index: -1;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 4px;
+  background: repeating-linear-gradient(90deg, transparent 0 6px, var(--paper) 6px 11px);
+}
+
+.button--film::before {
+  top: 3px;
+}
+
+.button--film::after {
+  bottom: 3px;
+}
+
+.film-strip {
+  display: flex;
+  transition: transform 0.5s steps(3, end);
+}
+
+.film-strip > span {
+  flex: 0 0 184px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.film-strip > span + span {
+  border-left: 2px solid var(--paper);
   background: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.45s var(--ease);
+  color: var(--paper);
 }
 
-.button--advance:hover,
-.button--advance:hover:not(:disabled) {
-  background: var(--ink);
-}
-
-.button--advance:hover::before,
-.button--advance:focus-visible::before,
-.button--advance:active::before {
-  transform: scaleX(1);
-}
-
-.button--advance svg {
+.button--film svg {
   width: 18px;
   height: 18px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;
-  transition: transform 0.45s var(--ease);
 }
 
-.button--advance:hover svg,
-.button--advance:focus-visible svg,
-.button--advance:active svg {
-  transform: translateX(4px);
+.button--film:hover .film-strip,
+.button--film:focus-visible .film-strip,
+.button--film:active .film-strip {
+  transform: translateX(-184px);
 }
 
 .to-top {
