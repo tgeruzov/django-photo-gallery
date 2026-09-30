@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initToTop();
   initWordmark();
   initFlaps();
+  fillFilmStrip();
   initGallery();
   initUploadForm();
 });
@@ -1250,6 +1251,25 @@ function createSplitFlap(el, { flipMs = 70, stagger = 35, flips = 5 } = {}) {
   }
 
   return { set };
+}
+
+// 404: кадры вокруг пропавшего заполняются случайными снимками галереи.
+// Если запрос не удался, кадры просто остаются тёмными.
+async function fillFilmStrip() {
+  const film = document.querySelector('.film[data-fill-photos]');
+  if (!film) return;
+  const frames = Array.from(film.querySelectorAll('.film-frame:not(.film-frame--missing)'));
+  try {
+    const response = await fetch('/all_photos.json?page_size=60', { headers: { 'Accept': 'application/json' } });
+    if (!response.ok) return;
+    const photos = (await response.json()).photos || [];
+    const picked = photos.sort(() => Math.random() - 0.5).slice(0, frames.length);
+    picked.forEach((photo, i) => {
+      frames[i].style.backgroundImage = `url("${photo.url}")`;
+    });
+  } catch (err) {
+    // сеть недоступна - пустые кадры тоже смотрятся как плёнка
+  }
 }
 
 function initFlaps() {

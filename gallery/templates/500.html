@@ -1,13 +1,30 @@
 {% extends "gallery/base.html" %}
 
-{% block title %}Ошибка сервера - Timur Geruzov{% endblock %}
+{% block title %}Засветка - Timur Geruzov{% endblock %}
 {% block meta_robots %}noindex, nofollow{% endblock %}
 
 {% block content %}
-  <section class="error-page">
-    <p class="error-code" data-split-flap>500</p>
-    <h1 class="page-title">Ошибка сервера</h1>
-    <p>Что-то сломалось на нашей стороне. Попробуйте обновить страницу позже.</p>
+  <section class="error-page error-page--exposed">
+    <div class="film" aria-hidden="true">
+      <a class="film-frame" href="/" tabindex="-1">
+        <span class="film-number">498</span>
+      </a>
+      <a class="film-frame" href="/" tabindex="-1">
+        <span class="film-number">499</span>
+      </a>
+      <div class="film-frame film-frame--missing">
+        <span class="film-code" data-split-flap>500</span>
+        <span class="film-number">500</span>
+      </div>
+      <a class="film-frame" href="/" tabindex="-1">
+        <span class="film-number">501</span>
+      </a>
+      <a class="film-frame" href="/" tabindex="-1">
+        <span class="film-number">502</span>
+      </a>
+    </div>
+    <h1 class="page-title">Засветка</h1>
+    <p>Что-то сломалось на нашей стороне. Попробуйте обновить страницу чуть позже.</p>
     <a class="button" href="/">В галерею</a>
   </section>
 {% endblock %}

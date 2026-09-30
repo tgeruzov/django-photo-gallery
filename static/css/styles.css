@@ -873,9 +873,118 @@ img {
 
 /* Страницы ошибок и футер */
 
-.error-code {
-  margin: 0 0 24px;
-  font: 500 clamp(2rem, 1.4rem + 3vw, 3.5rem)/1 var(--mono);
+/* Страницы ошибок: полоса плёнки. 404 - пропавший кадр среди настоящих
+   снимков галереи, 500 - засвеченная плёнка */
+
+.film {
+  --film: #171715;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  max-width: 980px;
+  margin: 0 auto 48px;
+  padding: 26px 10px 46px; /* снизу место под номера кадров между кадром и перфорацией */
+  background:
+    /* перфорация сверху и снизу */
+    repeating-linear-gradient(90deg, transparent 0 10px, var(--paper) 10px 22px, transparent 22px 34px) top 8px left 0 / 100% 10px no-repeat,
+    repeating-linear-gradient(90deg, transparent 0 10px, var(--paper) 10px 22px, transparent 22px 34px) bottom 8px left 0 / 100% 10px no-repeat,
+    var(--film);
+}
+
+.js .film {
+  animation: film-advance 1.1s var(--ease) both;
+}
+
+@keyframes film-advance {
+  from { opacity: 0; transform: translateX(48px); }
+}
+
+.film-frame {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  background: #0b0b0a center / cover no-repeat;
+  text-decoration: none;
+  transition: filter 0.3s var(--ease);
+}
+
+/* Номер кадра под ним, как на краю плёнки */
+.film-number {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -19px;
+  font: 400 10px/1 var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+/* 404: снимки галереи вокруг пустого кадра */
+.error-page--missing .film-frame:not(.film-frame--missing) {
+  filter: grayscale(0.4) brightness(0.75);
+}
+
+.error-page--missing .film-frame:not(.film-frame--missing):hover {
+  filter: none;
+}
+
+.film-frame--missing {
+  display: grid;
+  place-items: center;
+  background: transparent;
+  outline: 1px dashed rgba(236, 235, 230, 0.35);
+  outline-offset: -1px;
+}
+
+.film-frame--missing .film-number {
+  color: var(--accent);
+}
+
+.film-code {
+  font: 500 clamp(1rem, 0.7rem + 1.2vw, 1.6rem)/1 var(--mono);
+}
+
+/* 500: кадры выгорели, в центральном - оранжевый блик */
+.error-page--exposed .film-frame {
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(255, 252, 240, 0.95), rgba(236, 235, 230, 0.55) 55%, rgba(236, 235, 230, 0.25));
+}
+
+.error-page--exposed .film-frame--missing {
+  outline: 0;
+  background:
+    radial-gradient(circle at 70% 30%, #fff8ec, rgba(255, 90, 20, 0.85) 45%, rgba(255, 90, 20, 0.15) 80%);
+}
+
+.error-page--exposed .film-code {
+  color: var(--paper);
+}
+
+.js .error-page--exposed .film-frame {
+  animation: flare 4s ease-in-out infinite alternate;
+}
+
+.js .error-page--exposed .film-frame:nth-child(2n) {
+  animation-delay: -1.5s;
+}
+
+@keyframes flare {
+  to { filter: brightness(0.82); }
+}
+
+.error-page--exposed .film-number {
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .film {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .film-frame:first-child,
+  .film-frame:last-child {
+    display: none;
+  }
 }
 
 .error-page p:not(.error-code) {
