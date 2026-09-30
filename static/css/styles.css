@@ -508,6 +508,53 @@ img {
   cursor: not-allowed;
 }
 
+/* Кнопка со стрелкой: оранжевая заливка протягивается слева направо,
+   как плёнка в камере, стрелка сдвигается вперёд */
+.button--advance {
+  position: relative;
+  gap: 14px;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 0 20px 0 24px;
+}
+
+.button--advance::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s var(--ease);
+}
+
+.button--advance:hover,
+.button--advance:hover:not(:disabled) {
+  background: var(--ink);
+}
+
+.button--advance:hover::before,
+.button--advance:focus-visible::before,
+.button--advance:active::before {
+  transform: scaleX(1);
+}
+
+.button--advance svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  transition: transform 0.45s var(--ease);
+}
+
+.button--advance:hover svg,
+.button--advance:focus-visible svg,
+.button--advance:active svg {
+  transform: translateX(4px);
+}
+
 .to-top {
   position: fixed;
   right: calc(var(--pad) - 9px);
@@ -962,16 +1009,13 @@ img {
   color: rgba(255, 255, 255, 0.9);
 }
 
+/* Одна вспышка при открытии: кадры выгорают в белый и оседают, без повторов */
 .js .error-page--exposed .film-frame {
-  animation: flare 4s ease-in-out infinite alternate;
+  animation: flash 1.6s var(--ease) 0.3s both;
 }
 
-.js .error-page--exposed .film-frame:nth-child(2n) {
-  animation-delay: -1.5s;
-}
-
-@keyframes flare {
-  to { filter: brightness(0.82); }
+@keyframes flash {
+  from { filter: brightness(1.6) saturate(0.4); }
 }
 
 .error-page--exposed .film-number {
