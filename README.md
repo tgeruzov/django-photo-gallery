@@ -131,6 +131,14 @@ docker build -t django-photo-gallery .
 docker run -d --name gallery --restart unless-stopped -p 127.0.0.1:8000:8000 --env-file .env -v /srv/gallery/media:/app/media django-photo-gallery
 ```
 
+Образ для сервера, в отличие от локального запуска, администратора не создаёт: локальный `admin` с паролем `admin` на сервер не попадает. После первого запуска создайте своего, команда спросит логин и пароль:
+
+```bash
+docker exec -it gallery python manage.py createsuperuser
+```
+
+Сменить пароль потом можно командой `docker exec -it gallery python manage.py changepassword <логин>` или в `/admin/`.
+
 Ошибка в значении переменной, например `MAX_UPLOAD_SIZE_MB=1O0`, останавливает запуск с сообщением, где названа переменная. `docker stop` останавливает Gunicorn мягко: начатые запросы дорабатывают. Каждая строка лога содержит время, уровень и источник, Gunicorn пишет и журнал запросов.
 
 Проверка живости - `/healthz`: отвечает `200 {"status": "ok"}`, когда приложение и база работают, и `503`, когда база недоступна. Адрес не перенаправляется на HTTPS и понимает и `GET`, и `HEAD`, так что подходит и для healthcheck контейнера, и для внешнего мониторинга.
