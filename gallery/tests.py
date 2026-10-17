@@ -22,10 +22,12 @@ from django.urls import reverse
 from PIL import Image, ImageCms
 
 from .models import Photo
-from .services import save_uploaded_photo
+from .services import open_image, save_uploaded_photo
 from .throttle import LOGIN_ATTEMPTS_LIMIT
 
 AJAX = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+# Начало JPEG-файла: проверку сигнатуры проходит, а декодер дальше спотыкается
+JPEG_SIGNATURE = bytes([0xFF, 0xD8, 0xFF, 0xE0])
 
 
 def image_bytes(color=(200, 30, 30), size=(1200, 800), fmt="JPEG", mode="RGB", **save_kwargs):
@@ -124,6 +126,52 @@ class UploadTests(MediaTestCase):
         self.assertAlmostEqual(red, 40000 // 256, delta=2)
         self.assertEqual(red, green)
         self.assertEqual(green, blue)
+
+    def test_large_jpeg_is_decoded_reduced_and_still_rotated(self):
+        # Снимок вдвое больше крупной версии декодируется уменьшенным,
+        # а поворот из EXIF после этого всё равно применяется
+        exif = Image.Exif()
+        exif[0x0112] = 6  # повернуть на 90 градусов по часовой
+        content = image_bytes(size=(5200, 6000), exif=exif)
+
+        self.assertEqual(open_image(BytesIO(content)).size, (3000, 2600))
+        self.client.post(reverse("upload_photo"), {"files": upload(content=content)}, **AJAX)
+
+        photo = Photo.objects.get()
+        self.assertEqual(photo.optimized_width, 2560)
+        self.assertAlmostEqual(photo.optimized_height, 2560 * 2600 / 3000, delta=1)
+
+    def test_broken_image_leaves_no_photo_and_no_files(self):
+        broken = JPEG_SIGNATURE + b"not really a jpeg" * 100
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("upload_photo"), {"files": upload("broken.jpg", broken)}, **AJAX
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("broken.jpg", response.json()["errors"][0])
+        self.assertFalse(Photo.objects.exists())
+        media_root = Path(settings.MEDIA_ROOT)
+        self.assertEqual([path for path in media_root.rglob("*") if path.is_file()], [])
+
+    @override_settings(MAX_UPLOAD_SIZE_MB=1)
+    def test_file_over_the_limit_is_rejected(self):
+        content = JPEG_SIGNATURE + b"0" * (1024 * 1024)
+
+        response = self.client.post(
+            reverse("upload_photo"), {"files": upload("big.jpg", content)}, **AJAX
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Файл слишком большой", response.json()["errors"][0])
+
+    def test_upload_without_javascript_redirects_with_message(self):
+        response = self.client.post(reverse("upload_photo"), {"files": upload()}, follow=True)
+
+        self.assertRedirects(response, reverse("index"))
+        self.assertContains(response, "Загружено 1 фото")
+        self.assertEqual(Photo.objects.count(), 1)
 
     def test_original_gets_random_name(self):
         self.client.post(reverse("upload_photo"), {"files": upload("IMG_1234.JPG")}, **AJAX)
@@ -288,6 +336,54 @@ class GalleryPageTests(MediaTestCase):
         response = self.client.get("/", {"after": "zzz"}, **AJAX)
 
         self.assertEqual(response.json(), {"photos": [], "has_next": False})
+
+    def test_huge_cursor_values_do_not_crash(self):
+        save_uploaded_photo(upload())
+        huge = "9" * 30
+
+        for params in ({"after": huge, "after_pos": huge}, {"after": huge}):
+            response = self.client.get("/", params, **AJAX)
+            self.assertEqual(response.status_code, 200, params)
+
+    def test_feed_continues_after_deleted_cursor_photo(self):
+        photos = [
+            save_uploaded_photo(upload(f"{index}.jpg", image_bytes((index * 10, 0, 0))))
+            for index in range(4)
+        ]
+        newest_first = photos[::-1]
+        cursor = newest_first[1]
+        cursor_id, cursor_pos = cursor.pk, cursor.position
+        cursor.delete()
+
+        data = self.client.get("/", {"after": cursor_id, "after_pos": cursor_pos}, **AJAX).json()
+
+        self.assertEqual([item["id"] for item in data["photos"]], [p.pk for p in newest_first[2:]])
+
+    def test_ajax_page_out_of_range_is_empty(self):
+        response = self.client.get("/", {"page": 99}, **AJAX)
+
+        self.assertEqual(response.json(), {"photos": [], "has_next": False})
+
+    def test_all_photos_json_clamps_page_size_and_pages(self):
+        for index in range(3):
+            save_uploaded_photo(upload(f"{index}.jpg", image_bytes((index * 50, 0, 0))))
+        url = reverse("all_photos_json")
+        cases = [
+            ({"page_size": "0"}, 1, 1),
+            ({"page_size": "-5"}, 1, 1),
+            ({"page_size": "100000"}, 200, 3),
+            ({"page_size": "abc"}, 200, 3),
+            ({"page": "abc", "page_size": "2"}, 2, 2),
+        ]
+        for params, page_size, count in cases:
+            cache.clear()
+            data = self.client.get(url, params).json()
+            self.assertEqual((data["page_size"], len(data["photos"])), (page_size, count), params)
+            self.assertEqual(data["total"], 3)
+
+        cache.clear()
+        data = self.client.get(url, {"page": 5, "page_size": 2}).json()
+        self.assertEqual((data["photos"], data["has_next"], data["page"]), ([], False, 2))
 
 
 class ManageTests(MediaTestCase):
@@ -496,6 +592,10 @@ class ServiceEndpointTests(TestCase):
         response = self.client.get(reverse("healthz"))
 
         self.assertEqual(response.json(), {"status": "ok"})
+
+    def test_healthz_answers_head_for_uptime_monitors(self):
+        self.assertEqual(self.client.head(reverse("healthz")).status_code, 200)
+        self.assertEqual(self.client.post(reverse("healthz")).status_code, 405)
 
     def test_healthz_reports_database_failure(self):
         with mock.patch("gallery.views.connections") as connections:

@@ -15,7 +15,7 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_POST, require_safe
 
 from .models import Photo
 from .seo import (
@@ -392,7 +392,7 @@ def upload_photo(request):
     return render_upload_page(request, form)
 
 
-@require_GET
+@require_safe
 @cache_page(60)
 def all_photos_json(request):
     # tie-break по id: без него фото с одинаковой позицией прыгают между страницами
@@ -506,7 +506,7 @@ def manage_delete(request):
     )
 
 
-@require_GET
+@require_safe
 def healthz(request):
     """Проверка живости для контейнерных healthcheck-ов: приложение + БД."""
     # Настоящий запрос: на переиспользованном соединении (CONN_MAX_AGE)
@@ -519,7 +519,7 @@ def healthz(request):
     return with_x_robots_tag(JsonResponse({"status": "ok"}), NOINDEX_ROBOTS)
 
 
-@require_GET
+@require_safe
 @cache_page(60)
 def robots_txt(request):
     lines = [

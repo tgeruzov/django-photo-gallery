@@ -35,6 +35,10 @@ def open_image(file_obj) -> Image.Image:
     file_obj.seek(0)
     try:
         img = Image.open(file_obj)
+        # JPEG сразу декодируется в 2-8 раз меньше, если обе стороны всё равно
+        # не меньше самой крупной версии: 48 Мп снимок занимает в памяти
+        # в несколько раз меньше и обрабатывается быстрее. Другие форматы не меняются.
+        img.draft(None, OPTIMIZED_IMAGE_SIZE)
         img.load()
         img = img.copy()
     except Image.DecompressionBombError as exc:
