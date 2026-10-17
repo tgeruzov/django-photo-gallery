@@ -279,8 +279,13 @@ function initLightbox(gallery, feed) {
 
     lightbox.classList.remove('active');
     document.body.style.overflow = '';
-    if (lastFocused && typeof lastFocused.focus === 'function') {
-      lastFocused.focus({ preventScroll: true });
+    // Фокус уходит на карточку фото, которое было открыто последним: после
+    // листания клавиатура продолжает с него. Без этого фокус оставался на
+    // крестике скрытого диалога там, где клик не фокусирует кнопку (Safari, Firefox на Mac)
+    const sourceCard = sourceEl && sourceEl.isConnected ? sourceEl.closest('.card') : null;
+    const focusTarget = sourceCard || lastFocused;
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      focusTarget.focus({ preventScroll: true });
     }
     lastFocused = null;
 
@@ -728,6 +733,7 @@ function initUploadForm() {
   const previewNodes = new Map(); // file -> wrapper element
   const fileLabelText = form.querySelector('.dropzone-text');
   const defaultLabelText = fileLabelText ? fileLabelText.textContent : '';
+  const defaultSubmitText = submitBtn.textContent;
   submitBtn.disabled = true;
 
   // Файл, уроненный мимо зоны, не должен открываться браузером
@@ -1076,6 +1082,24 @@ function initUploadForm() {
 
       uploading = false;
       preview.classList.remove('is-busy');
+
+      if (!failedFiles.length && !uploadedCount) {
+          // Все выбранные фото уже есть в галерее: уход в неё молча выглядел бы
+          // как успешная загрузка. Превью с пометкой "Уже есть" остаются на месте.
+          submitBtn.classList.remove('is-loading');
+          submitBtn.textContent = defaultSubmitText;
+          selectedFiles = [];
+          updateFileInput();
+          updateFileLabel();
+          submitBtn.disabled = true;
+          setUploadStatus(
+              duplicateCount === 1
+                  ? 'Это фото уже есть в галерее, новых не добавлено.'
+                  : `Все выбранные фото уже есть в галерее (${duplicateCount}), новых не добавлено.`,
+              'info'
+          );
+          return;
+      }
 
       if (!failedFiles.length) {
           // Короткая пауза, чтобы состояние "Готово" успело показаться

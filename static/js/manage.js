@@ -23,6 +23,13 @@ function initManagePhotos() {
   const buttonOf = tile => tile.querySelector('.manage-tile-button');
   const currentOrder = () => tiles().map(tileId);
   const sameOrder = (a, b) => a.length === b.length && a.every((id, i) => id === b[i]);
+  // В фоновой вкладке анимация не доигрывает и finished не наступает:
+  // удаление не должно зависать на "Удаляем..." до возвращения во вкладку
+  const settled = (animation, timeoutMs) =>
+    Promise.race([
+      animation.finished.catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, timeoutMs)),
+    ]);
 
   const selected = new Set();
   let anchor = null; // от него Shift+клик выделяет диапазон
@@ -230,15 +237,17 @@ function initManagePhotos() {
       const data = await postJson(root.dataset.deleteUrl, { ids });
       victims.forEach(tile => setSelected(tile, false));
       anchor = null;
+      const fadeMs = reduceMotion.matches ? 120 : 200;
       await Promise.all(
         victims.map(tile =>
-          tile
-            .animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(0.94)' }], {
-              duration: reduceMotion.matches ? 120 : 200,
+          settled(
+            tile.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(0.94)' }], {
+              duration: fadeMs,
               easing: EASE,
               fill: 'forwards',
-            })
-            .finished.catch(() => {})
+            }),
+            fadeMs + 200
+          )
         )
       );
       flip(() => victims.forEach(tile => tile.remove()));

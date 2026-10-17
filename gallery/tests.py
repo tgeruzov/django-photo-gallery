@@ -295,6 +295,15 @@ class GalleryPageTests(MediaTestCase):
         self.assertEqual(self.canonical("/?page=abc"), "http://testserver/")
         self.assertEqual(self.canonical("/?page=1&utm_source=x"), "http://testserver/")
 
+    def test_empty_gallery_shows_the_owner_where_to_start(self):
+        login = f"{reverse('admin:login')}?next={reverse('upload_photo')}"
+
+        self.assertContains(self.client.get("/"), f'href="{login}"')
+        self.make_admin()
+        response = self.client.get("/")
+        self.assertNotContains(response, f'href="{login}"')
+        self.assertContains(response, f'href="{reverse("upload_photo")}"')
+
     def test_canonical_keeps_real_page_number(self):
         for index in range(13):
             save_uploaded_photo(upload(f"{index}.jpg", image_bytes((index * 10, 0, 0))))

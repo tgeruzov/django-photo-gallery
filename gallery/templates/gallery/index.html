@@ -43,6 +43,9 @@
       <p class="empty-state-title">Пока пусто</p>
       {% if user.is_staff %}
       <a class="button" href="{% url 'upload_photo' %}">Загрузить фото</a>
+      {% else %}
+      {# Пустую галерею видит прежде всего её владелец после первого запуска #}
+      <a class="manage-link" href="{% url 'admin:login' %}?next={% url 'upload_photo' %}">Войти и загрузить фото</a>
       {% endif %}
     </div>
     {% endfor %}
