@@ -1,11 +1,12 @@
 # Локальный запуск: docker compose up --build, затем http://localhost:8000
+# Значения ниже можно переопределить в файле .env рядом (образец - .env.example)
 services:
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: gallery
       POSTGRES_USER: gallery
-      POSTGRES_PASSWORD: gallery
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-gallery}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,18 +24,19 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              (python manage.py createsuperuser --noinput 2>/dev/null || true) &&
-             python manage.py devserver 0.0.0.0:8000"
+             exec python manage.py devserver 0.0.0.0:8000"
     volumes:
       - .:/app
     environment:
       DEBUG: "1"
       DB_HOST: db
-      # Локальный администратор для страницы загрузки и /admin/, создаётся при первом запуске
-      DJANGO_SUPERUSER_USERNAME: admin
-      DJANGO_SUPERUSER_EMAIL: admin@example.com
-      DJANGO_SUPERUSER_PASSWORD: admin
+      DB_PASSWORD: ${DB_PASSWORD:-gallery}
+      # Локальный администратор для раздела управления и /admin/, создаётся при первом запуске
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-admin}
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
