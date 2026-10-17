@@ -5,6 +5,8 @@ import re
 import shutil
 import tempfile
 from io import BytesIO
+from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from django.apps import apps as django_apps
@@ -461,6 +463,29 @@ class DevserverTests(TestCase):
 
         self.assertTrue(any(path.endswith("0004_photo_position.py") for path in paths))
         self.assertFalse(any("site-packages" in path for path in paths))
+
+    def test_venv_inside_the_project_is_not_a_project_app(self):
+        # Регрессия: с .venv внутри проекта миграции Django считались своими
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        site_packages = root / ".venv" / "Lib" / "site-packages"
+        own_app, library_app = root / "gallery", site_packages / "django_app"
+        for app_dir in (own_app, library_app):
+            (app_dir / "migrations").mkdir(parents=True)
+        app_configs = [SimpleNamespace(path=str(own_app)), SimpleNamespace(path=str(library_app))]
+
+        with (
+            self.settings(BASE_DIR=root),
+            mock.patch.object(self.devserver.apps, "get_app_configs", return_value=app_configs),
+            mock.patch.object(
+                self.devserver.sysconfig,
+                "get_paths",
+                return_value={"purelib": str(site_packages), "platlib": str(site_packages)},
+            ),
+        ):
+            dirs = list(self.devserver.project_migration_dirs())
+
+        self.assertEqual(dirs, [(own_app / "migrations").resolve()])
 
 
 class ServiceEndpointTests(TestCase):

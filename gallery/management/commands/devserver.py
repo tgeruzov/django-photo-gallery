@@ -8,6 +8,7 @@
 вызывает, его автоперезагрузчик Django не замечает.
 """
 
+import sysconfig
 import threading
 from pathlib import Path
 
@@ -21,11 +22,19 @@ from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.executor import MigrationExecutor
 
 
+def library_dirs():
+    """Папки установленных пакетов: виртуальное окружение бывает внутри проекта (.venv)."""
+    paths = sysconfig.get_paths()
+    return {Path(paths[key]).resolve() for key in ("purelib", "platlib")}
+
+
 def project_migration_dirs():
     base_dir = Path(settings.BASE_DIR).resolve()
+    libraries = library_dirs()
     for app_config in apps.get_app_configs():
         migrations_dir = Path(app_config.path).resolve() / "migrations"
-        if migrations_dir.is_dir() and base_dir in migrations_dir.parents:
+        parents = set(migrations_dir.parents)
+        if migrations_dir.is_dir() and base_dir in parents and not libraries & parents:
             yield migrations_dir
 
 
