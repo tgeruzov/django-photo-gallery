@@ -3,6 +3,8 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 from io import BytesIO
 from pathlib import Path
@@ -10,11 +12,12 @@ from types import SimpleNamespace
 from unittest import mock
 
 from django.apps import apps as django_apps
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.utils import OperationalError
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from PIL import Image, ImageCms
 
@@ -510,3 +513,48 @@ class ServiceEndpointTests(TestCase):
 
         self.assertEqual(self.client.get("/missing/").status_code, 404)
         self.assertEqual(server_error(RequestFactory().get("/")).status_code, 500)
+
+
+class ConfigTests(SimpleTestCase):
+    """Опечатка в окружении - понятная ошибка при старте, а не traceback посреди работы."""
+
+    def load_settings(self, code="import config.settings", **env):
+        environ = {**os.environ, "DEBUG": "0", "SECRET_KEY": "s" * 50, **env}
+        return subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=settings.BASE_DIR,
+            env=environ,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def assert_config_error(self, message, **env):
+        result = self.load_settings(**env)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ImproperlyConfigured", result.stderr)
+        self.assertIn(message, result.stderr)
+
+    def test_production_settings_load(self):
+        result = self.load_settings()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_secret_key_is_required_in_production(self):
+        self.assert_config_error("SECRET_KEY must be set", SECRET_KEY="")
+
+    def test_bad_numbers_are_reported_by_name(self):
+        self.assert_config_error("MAX_UPLOAD_SIZE_MB must be an integer", MAX_UPLOAD_SIZE_MB="1O0")
+        self.assert_config_error("MAX_UPLOAD_SIZE_MB must be at least 1", MAX_UPLOAD_SIZE_MB="0")
+        self.assert_config_error("SECURE_HSTS_SECONDS must be at least 0", SECURE_HSTS_SECONDS="-1")
+
+    def test_unknown_log_level_is_rejected(self):
+        self.assert_config_error("LOG_LEVEL must be", LOG_LEVEL="loud")
+
+    def test_media_root_comes_from_environment(self):
+        media_root = str(Path(tempfile.gettempdir()) / "gallery-media")
+        result = self.load_settings(
+            "import config.settings as s; print(s.MEDIA_ROOT)", MEDIA_ROOT=media_root
+        )
+
+        self.assertEqual(result.stdout.strip(), media_root)

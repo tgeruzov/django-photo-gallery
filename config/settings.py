@@ -17,6 +17,20 @@ def env_list(name, default=""):
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 
 
+def env_int(name, default, minimum=0):
+    """Целое из окружения; опечатка в значении - понятная ошибка при старте, а не traceback."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return default
+    try:
+        number = int(value)
+    except ValueError:
+        raise ImproperlyConfigured(f"{name} must be an integer, got {value!r}.") from None
+    if number < minimum:
+        raise ImproperlyConfigured(f"{name} must be at least {minimum}, got {number}.")
+    return number
+
+
 DEBUG = env_bool("DEBUG", False)
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 if not SECRET_KEY:
@@ -76,6 +90,11 @@ DATABASES = {
         "HOST": os.environ.get("DB_HOST", "localhost"),
         "PORT": os.environ.get("DB_PORT", "5432"),
         "CONN_MAX_AGE": 60,
+        # Соединение, которое база оборвала (перезапуск PostgreSQL), проверяется
+        # перед запросом, а не роняет его ошибкой
+        "CONN_HEALTH_CHECKS": True,
+        # Недоступная база - быстрая ошибка и 503 на /healthz, а не зависший воркер
+        "OPTIONS": {"connect_timeout": 10},
     }
 }
 
@@ -96,7 +115,7 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", "").strip() or BASE_DIR / "media")
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
@@ -106,7 +125,7 @@ STORAGES = {
     },
 }
 
-MAX_UPLOAD_SIZE_MB = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "100"))
+MAX_UPLOAD_SIZE_MB = env_int("MAX_UPLOAD_SIZE_MB", 100, minimum=1)
 # 1 = оригиналы удаляются безвозвратно после генерации оптимизированной версии
 DELETE_ORIGINAL_AFTER_OPTIMIZE = env_bool("DELETE_ORIGINAL_AFTER_OPTIMIZE", False)
 
@@ -114,16 +133,28 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
     SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
-    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "2592000"))
+    SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 2592000)
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Strict"
 
+# HSTS preload - отдельное решение владельца домена: из списка предзагрузки
+# браузеров быстро не выйти, поэтому check --deploy об этом не напоминает
+SILENCED_SYSTEM_CHECKS = ["security.W021"]
+
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "").strip().upper() or "INFO"
+if LOG_LEVEL not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+    raise ImproperlyConfigured(
+        f"LOG_LEVEL must be DEBUG, INFO, WARNING, ERROR or CRITICAL, got {LOG_LEVEL!r}."
+    )
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+    # Время, уровень и источник в каждой строке: по логам контейнера видно, что и когда случилось
+    "formatters": {"plain": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }
