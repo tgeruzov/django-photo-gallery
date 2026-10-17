@@ -515,6 +515,54 @@ class ManageTests(MediaTestCase):
         self.assertEqual([positions[p.pk] for p in reversed(self.photos)], [0, 1, 2, 3])
 
 
+class MainScenarioTests(MediaTestCase):
+    """Главный путь владельца от входа до удаления, как его проходит браузер."""
+
+    def test_owner_publishes_reorders_and_deletes(self):
+        User.objects.create_superuser("owner", "owner@example.com", "owner-pass-123")
+        login_url = f"{reverse('admin:login')}?next={reverse('upload_photo')}"
+        response = self.client.post(
+            login_url, {"username": "owner", "password": "owner-pass-123"}, follow=True
+        )
+        self.assertEqual(response.request["PATH_INFO"], reverse("upload_photo"))
+
+        for index in range(3):
+            response = self.client.post(
+                reverse("upload_photo"),
+                {"files": upload(f"{index}.jpg", image_bytes((index * 80, 40, 40)))},
+                **AJAX,
+            )
+            self.assertTrue(response.json()["success"])
+        newest_first = list(Photo.objects.order_by("position", "-id").values_list("id", flat=True))
+
+        html = self.client.get("/").content.decode()
+        self.assertEqual([int(pk) for pk in re.findall(r'data-id="(\d+)"', html)], newest_first)
+
+        order = newest_first[::-1]
+        self.client.post(
+            reverse("manage_reorder"), json.dumps({"ids": order}), content_type="application/json"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("manage_delete"),
+                json.dumps({"ids": [order[0]]}),
+                content_type="application/json",
+            )
+        self.assertEqual(response.json()["total"], 2)
+
+        self.client.logout()
+        html = self.client.get("/").content.decode()
+        self.assertEqual([int(pk) for pk in re.findall(r'data-id="(\d+)"', html)], order[1:])
+        self.assertNotIn("Управление галереей", html)
+        media_files = {path for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file()}
+        expected = {
+            Path(field.path)
+            for photo in Photo.objects.all()
+            for field in (photo.image, photo.optimized_image, photo.medium_image, photo.thumbnail)
+        }
+        self.assertEqual(media_files, expected)
+
+
 class DevserverTests(TestCase):
     """Сервер разработки сам применяет миграции, когда появляются новые файлы."""
 

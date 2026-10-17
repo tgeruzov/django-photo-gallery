@@ -6,6 +6,10 @@ venv/
 .env
 .idea/
 .vscode/
+# Отчёты coverage и кэш линтера
+.coverage
+htmlcov/
+.ruff_cache/
 
 # Uploaded photos and collectstatic output: created by the running app, not published
 media/
