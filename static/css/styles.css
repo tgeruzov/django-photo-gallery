@@ -1040,7 +1040,9 @@ img {
 }
 
 .manage-link {
-  padding: 0;
+  /* Зона нажатия 24px по высоте при той же раскладке: строка текста всего 12px */
+  padding: 6px 0;
+  margin: -6px 0;
   border: 0;
   background: none;
   font: 400 12px/1 var(--mono);

@@ -3,24 +3,31 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 from io import BytesIO
+from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from django.apps import apps as django_apps
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.utils import OperationalError
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from PIL import Image, ImageCms
 
 from .models import Photo
-from .services import save_uploaded_photo
+from .services import open_image, save_uploaded_photo
 from .throttle import LOGIN_ATTEMPTS_LIMIT
 
 AJAX = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+# Начало JPEG-файла: проверку сигнатуры проходит, а декодер дальше спотыкается
+JPEG_SIGNATURE = bytes([0xFF, 0xD8, 0xFF, 0xE0])
 
 
 def image_bytes(color=(200, 30, 30), size=(1200, 800), fmt="JPEG", mode="RGB", **save_kwargs):
@@ -119,6 +126,52 @@ class UploadTests(MediaTestCase):
         self.assertAlmostEqual(red, 40000 // 256, delta=2)
         self.assertEqual(red, green)
         self.assertEqual(green, blue)
+
+    def test_large_jpeg_is_decoded_reduced_and_still_rotated(self):
+        # Снимок вдвое больше крупной версии декодируется уменьшенным,
+        # а поворот из EXIF после этого всё равно применяется
+        exif = Image.Exif()
+        exif[0x0112] = 6  # повернуть на 90 градусов по часовой
+        content = image_bytes(size=(5200, 6000), exif=exif)
+
+        self.assertEqual(open_image(BytesIO(content)).size, (3000, 2600))
+        self.client.post(reverse("upload_photo"), {"files": upload(content=content)}, **AJAX)
+
+        photo = Photo.objects.get()
+        self.assertEqual(photo.optimized_width, 2560)
+        self.assertAlmostEqual(photo.optimized_height, 2560 * 2600 / 3000, delta=1)
+
+    def test_broken_image_leaves_no_photo_and_no_files(self):
+        broken = JPEG_SIGNATURE + b"not really a jpeg" * 100
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("upload_photo"), {"files": upload("broken.jpg", broken)}, **AJAX
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("broken.jpg", response.json()["errors"][0])
+        self.assertFalse(Photo.objects.exists())
+        media_root = Path(settings.MEDIA_ROOT)
+        self.assertEqual([path for path in media_root.rglob("*") if path.is_file()], [])
+
+    @override_settings(MAX_UPLOAD_SIZE_MB=1)
+    def test_file_over_the_limit_is_rejected(self):
+        content = JPEG_SIGNATURE + b"0" * (1024 * 1024)
+
+        response = self.client.post(
+            reverse("upload_photo"), {"files": upload("big.jpg", content)}, **AJAX
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Файл слишком большой", response.json()["errors"][0])
+
+    def test_upload_without_javascript_redirects_with_message(self):
+        response = self.client.post(reverse("upload_photo"), {"files": upload()}, follow=True)
+
+        self.assertRedirects(response, reverse("index"))
+        self.assertContains(response, "Загружено 1 фото")
+        self.assertEqual(Photo.objects.count(), 1)
 
     def test_original_gets_random_name(self):
         self.client.post(reverse("upload_photo"), {"files": upload("IMG_1234.JPG")}, **AJAX)
@@ -242,6 +295,15 @@ class GalleryPageTests(MediaTestCase):
         self.assertEqual(self.canonical("/?page=abc"), "http://testserver/")
         self.assertEqual(self.canonical("/?page=1&utm_source=x"), "http://testserver/")
 
+    def test_empty_gallery_shows_the_owner_where_to_start(self):
+        login = f"{reverse('admin:login')}?next={reverse('upload_photo')}"
+
+        self.assertContains(self.client.get("/"), f'href="{login}"')
+        self.make_admin()
+        response = self.client.get("/")
+        self.assertNotContains(response, f'href="{login}"')
+        self.assertContains(response, f'href="{reverse("upload_photo")}"')
+
     def test_canonical_keeps_real_page_number(self):
         for index in range(13):
             save_uploaded_photo(upload(f"{index}.jpg", image_bytes((index * 10, 0, 0))))
@@ -283,6 +345,54 @@ class GalleryPageTests(MediaTestCase):
         response = self.client.get("/", {"after": "zzz"}, **AJAX)
 
         self.assertEqual(response.json(), {"photos": [], "has_next": False})
+
+    def test_huge_cursor_values_do_not_crash(self):
+        save_uploaded_photo(upload())
+        huge = "9" * 30
+
+        for params in ({"after": huge, "after_pos": huge}, {"after": huge}):
+            response = self.client.get("/", params, **AJAX)
+            self.assertEqual(response.status_code, 200, params)
+
+    def test_feed_continues_after_deleted_cursor_photo(self):
+        photos = [
+            save_uploaded_photo(upload(f"{index}.jpg", image_bytes((index * 10, 0, 0))))
+            for index in range(4)
+        ]
+        newest_first = photos[::-1]
+        cursor = newest_first[1]
+        cursor_id, cursor_pos = cursor.pk, cursor.position
+        cursor.delete()
+
+        data = self.client.get("/", {"after": cursor_id, "after_pos": cursor_pos}, **AJAX).json()
+
+        self.assertEqual([item["id"] for item in data["photos"]], [p.pk for p in newest_first[2:]])
+
+    def test_ajax_page_out_of_range_is_empty(self):
+        response = self.client.get("/", {"page": 99}, **AJAX)
+
+        self.assertEqual(response.json(), {"photos": [], "has_next": False})
+
+    def test_all_photos_json_clamps_page_size_and_pages(self):
+        for index in range(3):
+            save_uploaded_photo(upload(f"{index}.jpg", image_bytes((index * 50, 0, 0))))
+        url = reverse("all_photos_json")
+        cases = [
+            ({"page_size": "0"}, 1, 1),
+            ({"page_size": "-5"}, 1, 1),
+            ({"page_size": "100000"}, 200, 3),
+            ({"page_size": "abc"}, 200, 3),
+            ({"page": "abc", "page_size": "2"}, 2, 2),
+        ]
+        for params, page_size, count in cases:
+            cache.clear()
+            data = self.client.get(url, params).json()
+            self.assertEqual((data["page_size"], len(data["photos"])), (page_size, count), params)
+            self.assertEqual(data["total"], 3)
+
+        cache.clear()
+        data = self.client.get(url, {"page": 5, "page_size": 2}).json()
+        self.assertEqual((data["photos"], data["has_next"], data["page"]), ([], False, 2))
 
 
 class ManageTests(MediaTestCase):
@@ -405,6 +515,54 @@ class ManageTests(MediaTestCase):
         self.assertEqual([positions[p.pk] for p in reversed(self.photos)], [0, 1, 2, 3])
 
 
+class MainScenarioTests(MediaTestCase):
+    """Главный путь владельца от входа до удаления, как его проходит браузер."""
+
+    def test_owner_publishes_reorders_and_deletes(self):
+        User.objects.create_superuser("owner", "owner@example.com", "owner-pass-123")
+        login_url = f"{reverse('admin:login')}?next={reverse('upload_photo')}"
+        response = self.client.post(
+            login_url, {"username": "owner", "password": "owner-pass-123"}, follow=True
+        )
+        self.assertEqual(response.request["PATH_INFO"], reverse("upload_photo"))
+
+        for index in range(3):
+            response = self.client.post(
+                reverse("upload_photo"),
+                {"files": upload(f"{index}.jpg", image_bytes((index * 80, 40, 40)))},
+                **AJAX,
+            )
+            self.assertTrue(response.json()["success"])
+        newest_first = list(Photo.objects.order_by("position", "-id").values_list("id", flat=True))
+
+        html = self.client.get("/").content.decode()
+        self.assertEqual([int(pk) for pk in re.findall(r'data-id="(\d+)"', html)], newest_first)
+
+        order = newest_first[::-1]
+        self.client.post(
+            reverse("manage_reorder"), json.dumps({"ids": order}), content_type="application/json"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("manage_delete"),
+                json.dumps({"ids": [order[0]]}),
+                content_type="application/json",
+            )
+        self.assertEqual(response.json()["total"], 2)
+
+        self.client.logout()
+        html = self.client.get("/").content.decode()
+        self.assertEqual([int(pk) for pk in re.findall(r'data-id="(\d+)"', html)], order[1:])
+        self.assertNotIn("Управление галереей", html)
+        media_files = {path for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file()}
+        expected = {
+            Path(field.path)
+            for photo in Photo.objects.all()
+            for field in (photo.image, photo.optimized_image, photo.medium_image, photo.thumbnail)
+        }
+        self.assertEqual(media_files, expected)
+
+
 class DevserverTests(TestCase):
     """Сервер разработки сам применяет миграции, когда появляются новые файлы."""
 
@@ -462,12 +620,39 @@ class DevserverTests(TestCase):
         self.assertTrue(any(path.endswith("0004_photo_position.py") for path in paths))
         self.assertFalse(any("site-packages" in path for path in paths))
 
+    def test_venv_inside_the_project_is_not_a_project_app(self):
+        # Регрессия: с .venv внутри проекта миграции Django считались своими
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        site_packages = root / ".venv" / "Lib" / "site-packages"
+        own_app, library_app = root / "gallery", site_packages / "django_app"
+        for app_dir in (own_app, library_app):
+            (app_dir / "migrations").mkdir(parents=True)
+        app_configs = [SimpleNamespace(path=str(own_app)), SimpleNamespace(path=str(library_app))]
+
+        with (
+            self.settings(BASE_DIR=root),
+            mock.patch.object(self.devserver.apps, "get_app_configs", return_value=app_configs),
+            mock.patch.object(
+                self.devserver.sysconfig,
+                "get_paths",
+                return_value={"purelib": str(site_packages), "platlib": str(site_packages)},
+            ),
+        ):
+            dirs = list(self.devserver.project_migration_dirs())
+
+        self.assertEqual(dirs, [(own_app / "migrations").resolve()])
+
 
 class ServiceEndpointTests(TestCase):
     def test_healthz_ok(self):
         response = self.client.get(reverse("healthz"))
 
         self.assertEqual(response.json(), {"status": "ok"})
+
+    def test_healthz_answers_head_for_uptime_monitors(self):
+        self.assertEqual(self.client.head(reverse("healthz")).status_code, 200)
+        self.assertEqual(self.client.post(reverse("healthz")).status_code, 405)
 
     def test_healthz_reports_database_failure(self):
         with mock.patch("gallery.views.connections") as connections:
@@ -485,3 +670,48 @@ class ServiceEndpointTests(TestCase):
 
         self.assertEqual(self.client.get("/missing/").status_code, 404)
         self.assertEqual(server_error(RequestFactory().get("/")).status_code, 500)
+
+
+class ConfigTests(SimpleTestCase):
+    """Опечатка в окружении - понятная ошибка при старте, а не traceback посреди работы."""
+
+    def load_settings(self, code="import config.settings", **env):
+        environ = {**os.environ, "DEBUG": "0", "SECRET_KEY": "s" * 50, **env}
+        return subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=settings.BASE_DIR,
+            env=environ,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def assert_config_error(self, message, **env):
+        result = self.load_settings(**env)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ImproperlyConfigured", result.stderr)
+        self.assertIn(message, result.stderr)
+
+    def test_production_settings_load(self):
+        result = self.load_settings()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_secret_key_is_required_in_production(self):
+        self.assert_config_error("SECRET_KEY must be set", SECRET_KEY="")
+
+    def test_bad_numbers_are_reported_by_name(self):
+        self.assert_config_error("MAX_UPLOAD_SIZE_MB must be an integer", MAX_UPLOAD_SIZE_MB="1O0")
+        self.assert_config_error("MAX_UPLOAD_SIZE_MB must be at least 1", MAX_UPLOAD_SIZE_MB="0")
+        self.assert_config_error("SECURE_HSTS_SECONDS must be at least 0", SECURE_HSTS_SECONDS="-1")
+
+    def test_unknown_log_level_is_rejected(self):
+        self.assert_config_error("LOG_LEVEL must be", LOG_LEVEL="loud")
+
+    def test_media_root_comes_from_environment(self):
+        media_root = str(Path(tempfile.gettempdir()) / "gallery-media")
+        result = self.load_settings(
+            "import config.settings as s; print(s.MEDIA_ROOT)", MEDIA_ROOT=media_root
+        )
+
+        self.assertEqual(result.stdout.strip(), media_root)

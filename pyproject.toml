@@ -1,0 +1,29 @@
+# Настройки инструментов разработки. Зависимости приложения - в requirements.txt,
+# инструменты - в requirements-dev.txt
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ", "S", "SIM", "C4", "PIE", "LOG", "G", "RUF"]
+ignore = [
+    # Кириллица в строках и комментариях - не опечатка
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # Meta.ordering, indexes и списки в миграциях Django по смыслу не изменяются
+    "RUF012",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Тесты запускают настройки в отдельном процессе и создают пользователей с паролями
+"gallery/tests.py" = ["S"]
+
+[tool.coverage.run]
+source = ["config", "gallery"]
+omit = ["*/migrations/*", "*/tests.py", "config/wsgi.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

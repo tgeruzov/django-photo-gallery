@@ -1,5 +1,12 @@
 .git
+.github
+docs
 media
 staticfiles
 **/__pycache__
 .venv
+.ruff_cache
+.coverage
+htmlcov
+# Настройки с паролями не должны попасть в образ
+.env
