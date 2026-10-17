@@ -69,18 +69,18 @@ class Photo(models.Model):
             models.Index(fields=["position", "-id"], name="gallery_photo_pos_id_idx"),
         ]
 
-    @classmethod
-    def top_position(cls):
-        """Позиция для нового фото: выше всех, что уже есть в ленте."""
-        lowest = cls.objects.aggregate(lowest=models.Min("position"))["lowest"]
-        return 0 if lowest is None else lowest - 1
-
     def __str__(self):
         if self.title:
             return self.title
         if self.image:
             return self.image.name
         return f"Photo #{self.pk or 'new'}"
+
+    @classmethod
+    def top_position(cls):
+        """Позиция для нового фото: выше всех, что уже есть в ленте."""
+        lowest = cls.objects.aggregate(lowest=models.Min("position"))["lowest"]
+        return 0 if lowest is None else lowest - 1
 
     def file_dimensions(self, file_field):
         """Размеры файла: из колонок БД, для оригинала - осторожно с диска."""
